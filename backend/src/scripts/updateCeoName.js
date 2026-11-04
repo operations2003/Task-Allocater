@@ -36,3 +36,4 @@ async function updateCeoName() {
 }
 
 updateCeoName();
+
