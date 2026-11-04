@@ -3,9 +3,11 @@
 -- Migration: 002_seed_initial_data.sql
 -- =====================================================================
 
+ALTER TABLE organizations ADD COLUMN IF NOT EXISTS domain VARCHAR(100);
+
 -- 1. SEED DEFAULT ORGANIZATION
-INSERT INTO organizations (id, name, domain)
-VALUES ('org-tasknera-ceo', 'TaskNera Global Technologies', 'tasknera.com')
+INSERT INTO organizations (id, name, code, email, status, domain)
+VALUES ('org-tasknera-ceo', 'TaskNera Global Technologies', 'TASKNERA_CEO', 'ceo@tasknera.com', 'Active', 'tasknera.com')
 ON CONFLICT (id) DO NOTHING;
 
 -- 2. SEED DEPARTMENTS
@@ -16,7 +18,7 @@ INSERT INTO departments (id, org_id, name, code) VALUES
 ('dept-sales', 'org-tasknera-ceo', 'Enterprise Sales & Growth', 'SALES'),
 ('dept-mktg', 'org-tasknera-ceo', 'Brand & Marketing', 'MKTG'),
 ('dept-fin', 'org-tasknera-ceo', 'Finance & Strategy', 'FIN')
-ON CONFLICT (org_id, code) DO NOTHING;
+ON CONFLICT (id) DO NOTHING;
 
 -- 3. SEED DESIGNATIONS
 INSERT INTO designations (id, org_id, title, code) VALUES
@@ -28,22 +30,29 @@ INSERT INTO designations (id, org_id, title, code) VALUES
 ('desig-head-ops', 'org-tasknera-ceo', 'Head of Operations', 'HEAD_OPS'),
 ('desig-sr-sales', 'org-tasknera-ceo', 'Enterprise Sales Director', 'SR_SALES'),
 ('desig-mktg-lead', 'org-tasknera-ceo', 'Growth Marketing Lead', 'MKTG_LEAD')
-ON CONFLICT (org_id, code) DO NOTHING;
+ON CONFLICT (id) DO NOTHING;
 
 -- 4. SEED CEO USER & EMPLOYEE ACCOUNT
 -- Password: TaskNera@Ceo2026!
-INSERT INTO users (id, org_id, email, password_hash, role, is_active)
+INSERT INTO users (id, org_id, email, password_hash, first_name, last_name, role, status, is_active)
 VALUES (
     'user-ceo-1',
     'org-tasknera-ceo',
     'ceo@tasknera.com',
     '$2a$10$lkFvD5nJHHIWiYjTlJ6qhemZc/IO65PdkSgG7Ly8eFI0X40wNNVwq',
+    'Vikram',
+    'Malhotra',
     'CEO',
+    'Active',
     true
 )
-ON CONFLICT (email) DO NOTHING;
+ON CONFLICT (id) DO UPDATE SET role = 'CEO', is_active = true, status = 'Active';
 
-INSERT INTO employees (id, org_id, user_id, employee_code, first_name, last_name, email, dept_id, desig_id, skills, current_workload, availability_status, is_active)
+INSERT INTO employees (
+    id, org_id, user_id, employee_code, first_name, last_name, email,
+    dept_id, desig_id, skills, current_workload, availability_status,
+    date_of_joining, employment_type, status, salary, is_active
+)
 VALUES (
     'emp-ceo-1',
     'org-tasknera-ceo',
@@ -57,17 +66,25 @@ VALUES (
     ARRAY['Executive Leadership', 'Corporate Strategy', 'Capital Allocation'],
     0,
     'AVAILABLE',
+    CURRENT_DATE,
+    'Full-Time',
+    'Active',
+    250000,
     true
 )
-ON CONFLICT (email) DO NOTHING;
+ON CONFLICT (id) DO UPDATE SET desig_id = 'desig-ceo', is_active = true, status = 'Active';
 
 -- 5. SEED CROSS-DEPARTMENT EMPLOYEES (Eligible Task Assignees - CEO is excluded)
 -- Employee 1: Aarav Sharma (Engineering Lead)
-INSERT INTO users (id, org_id, email, password_hash, role, is_active)
-VALUES ('user-emp-1', 'org-tasknera-ceo', 'aarav.sharma@tasknera.com', '$2a$10$lkFvD5nJHHIWiYjTlJ6qhemZc/IO65PdkSgG7Ly8eFI0X40wNNVwq', 'Employee', true)
-ON CONFLICT (email) DO NOTHING;
+INSERT INTO users (id, org_id, email, password_hash, first_name, last_name, role, status, is_active)
+VALUES ('user-emp-1', 'org-tasknera-ceo', 'aarav.sharma@tasknera.com', '$2a$10$lkFvD5nJHHIWiYjTlJ6qhemZc/IO65PdkSgG7Ly8eFI0X40wNNVwq', 'Aarav', 'Sharma', 'Employee', 'Active', true)
+ON CONFLICT (id) DO UPDATE SET role = 'Employee', is_active = true;
 
-INSERT INTO employees (id, org_id, user_id, employee_code, first_name, last_name, email, dept_id, desig_id, skills, current_workload, availability_status, is_active)
+INSERT INTO employees (
+    id, org_id, user_id, employee_code, first_name, last_name, email,
+    dept_id, desig_id, skills, current_workload, availability_status,
+    date_of_joining, employment_type, status, salary, is_active
+)
 VALUES (
     'emp-aarav-1',
     'org-tasknera-ceo',
@@ -81,16 +98,24 @@ VALUES (
     ARRAY['Cloud Architecture', 'Distributed Systems', 'PostgreSQL', 'Node.js', 'High Availability'],
     45,
     'AVAILABLE',
+    CURRENT_DATE,
+    'Full-Time',
+    'Active',
+    140000,
     true
 )
-ON CONFLICT (email) DO NOTHING;
+ON CONFLICT (id) DO NOTHING;
 
 -- Employee 2: Priya Patel (Senior Fullstack)
-INSERT INTO users (id, org_id, email, password_hash, role, is_active)
-VALUES ('user-emp-2', 'org-tasknera-ceo', 'priya.patel@tasknera.com', '$2a$10$lkFvD5nJHHIWiYjTlJ6qhemZc/IO65PdkSgG7Ly8eFI0X40wNNVwq', 'Employee', true)
-ON CONFLICT (email) DO NOTHING;
+INSERT INTO users (id, org_id, email, password_hash, first_name, last_name, role, status, is_active)
+VALUES ('user-emp-2', 'org-tasknera-ceo', 'priya.patel@tasknera.com', '$2a$10$lkFvD5nJHHIWiYjTlJ6qhemZc/IO65PdkSgG7Ly8eFI0X40wNNVwq', 'Priya', 'Patel', 'Employee', 'Active', true)
+ON CONFLICT (id) DO UPDATE SET role = 'Employee', is_active = true;
 
-INSERT INTO employees (id, org_id, user_id, employee_code, first_name, last_name, email, dept_id, desig_id, skills, current_workload, availability_status, is_active)
+INSERT INTO employees (
+    id, org_id, user_id, employee_code, first_name, last_name, email,
+    dept_id, desig_id, skills, current_workload, availability_status,
+    date_of_joining, employment_type, status, salary, is_active
+)
 VALUES (
     'emp-priya-2',
     'org-tasknera-ceo',
@@ -104,16 +129,24 @@ VALUES (
     ARRAY['React', 'UI Architecture', 'TypeScript', 'REST APIs', 'Performance Tuning'],
     65,
     'MODERATE',
+    CURRENT_DATE,
+    'Full-Time',
+    'Active',
+    115000,
     true
 )
-ON CONFLICT (email) DO NOTHING;
+ON CONFLICT (id) DO NOTHING;
 
 -- Employee 3: Rohan Verma (Lead Product Manager)
-INSERT INTO users (id, org_id, email, password_hash, role, is_active)
-VALUES ('user-emp-3', 'org-tasknera-ceo', 'rohan.verma@tasknera.com', '$2a$10$lkFvD5nJHHIWiYjTlJ6qhemZc/IO65PdkSgG7Ly8eFI0X40wNNVwq', 'Employee', true)
-ON CONFLICT (email) DO NOTHING;
+INSERT INTO users (id, org_id, email, password_hash, first_name, last_name, role, status, is_active)
+VALUES ('user-emp-3', 'org-tasknera-ceo', 'rohan.verma@tasknera.com', '$2a$10$lkFvD5nJHHIWiYjTlJ6qhemZc/IO65PdkSgG7Ly8eFI0X40wNNVwq', 'Rohan', 'Verma', 'Employee', 'Active', true)
+ON CONFLICT (id) DO UPDATE SET role = 'Employee', is_active = true;
 
-INSERT INTO employees (id, org_id, user_id, employee_code, first_name, last_name, email, dept_id, desig_id, skills, current_workload, availability_status, is_active)
+INSERT INTO employees (
+    id, org_id, user_id, employee_code, first_name, last_name, email,
+    dept_id, desig_id, skills, current_workload, availability_status,
+    date_of_joining, employment_type, status, salary, is_active
+)
 VALUES (
     'emp-rohan-3',
     'org-tasknera-ceo',
@@ -127,16 +160,24 @@ VALUES (
     ARRAY['Roadmap Strategy', 'Sprint Execution', 'KPI Metrics', 'Feature Specification'],
     30,
     'AVAILABLE',
+    CURRENT_DATE,
+    'Full-Time',
+    'Active',
+    125000,
     true
 )
-ON CONFLICT (email) DO NOTHING;
+ON CONFLICT (id) DO NOTHING;
 
 -- Employee 4: Ananya Iyer (Head of Operations)
-INSERT INTO users (id, org_id, email, password_hash, role, is_active)
-VALUES ('user-emp-4', 'org-tasknera-ceo', 'ananya.iyer@tasknera.com', '$2a$10$lkFvD5nJHHIWiYjTlJ6qhemZc/IO65PdkSgG7Ly8eFI0X40wNNVwq', 'Employee', true)
-ON CONFLICT (email) DO NOTHING;
+INSERT INTO users (id, org_id, email, password_hash, first_name, last_name, role, status, is_active)
+VALUES ('user-emp-4', 'org-tasknera-ceo', 'ananya.iyer@tasknera.com', '$2a$10$lkFvD5nJHHIWiYjTlJ6qhemZc/IO65PdkSgG7Ly8eFI0X40wNNVwq', 'Ananya', 'Iyer', 'Employee', 'Active', true)
+ON CONFLICT (id) DO UPDATE SET role = 'Employee', is_active = true;
 
-INSERT INTO employees (id, org_id, user_id, employee_code, first_name, last_name, email, dept_id, desig_id, skills, current_workload, availability_status, is_active)
+INSERT INTO employees (
+    id, org_id, user_id, employee_code, first_name, last_name, email,
+    dept_id, desig_id, skills, current_workload, availability_status,
+    date_of_joining, employment_type, status, salary, is_active
+)
 VALUES (
     'emp-ananya-4',
     'org-tasknera-ceo',
@@ -150,16 +191,24 @@ VALUES (
     ARRAY['Process Automation', 'Compliance', 'Vendor Relations', 'Operational Efficiency'],
     85,
     'OVERLOADED',
+    CURRENT_DATE,
+    'Full-Time',
+    'Active',
+    130000,
     true
 )
-ON CONFLICT (email) DO NOTHING;
+ON CONFLICT (id) DO NOTHING;
 
 -- Employee 5: Kabir Mehta (Enterprise Sales Director)
-INSERT INTO users (id, org_id, email, password_hash, role, is_active)
-VALUES ('user-emp-5', 'org-tasknera-ceo', 'kabir.mehta@tasknera.com', '$2a$10$lkFvD5nJHHIWiYjTlJ6qhemZc/IO65PdkSgG7Ly8eFI0X40wNNVwq', 'Employee', true)
-ON CONFLICT (email) DO NOTHING;
+INSERT INTO users (id, org_id, email, password_hash, first_name, last_name, role, status, is_active)
+VALUES ('user-emp-5', 'org-tasknera-ceo', 'kabir.mehta@tasknera.com', '$2a$10$lkFvD5nJHHIWiYjTlJ6qhemZc/IO65PdkSgG7Ly8eFI0X40wNNVwq', 'Kabir', 'Mehta', 'Employee', 'Active', true)
+ON CONFLICT (id) DO UPDATE SET role = 'Employee', is_active = true;
 
-INSERT INTO employees (id, org_id, user_id, employee_code, first_name, last_name, email, dept_id, desig_id, skills, current_workload, availability_status, is_active)
+INSERT INTO employees (
+    id, org_id, user_id, employee_code, first_name, last_name, email,
+    dept_id, desig_id, skills, current_workload, availability_status,
+    date_of_joining, employment_type, status, salary, is_active
+)
 VALUES (
     'emp-kabir-5',
     'org-tasknera-ceo',
@@ -173,16 +222,24 @@ VALUES (
     ARRAY['Enterprise Deals', 'Revenue Pipelines', 'Client Negotiations', 'Q3 Targets'],
     50,
     'AVAILABLE',
+    CURRENT_DATE,
+    'Full-Time',
+    'Active',
+    145000,
     true
 )
-ON CONFLICT (email) DO NOTHING;
+ON CONFLICT (id) DO NOTHING;
 
 -- Employee 6: Sneha Kapoor (Marketing Lead)
-INSERT INTO users (id, org_id, email, password_hash, role, is_active)
-VALUES ('user-emp-6', 'org-tasknera-ceo', 'sneha.kapoor@tasknera.com', '$2a$10$lkFvD5nJHHIWiYjTlJ6qhemZc/IO65PdkSgG7Ly8eFI0X40wNNVwq', 'Employee', true)
-ON CONFLICT (email) DO NOTHING;
+INSERT INTO users (id, org_id, email, password_hash, first_name, last_name, role, status, is_active)
+VALUES ('user-emp-6', 'org-tasknera-ceo', 'sneha.kapoor@tasknera.com', '$2a$10$lkFvD5nJHHIWiYjTlJ6qhemZc/IO65PdkSgG7Ly8eFI0X40wNNVwq', 'Sneha', 'Kapoor', 'Employee', 'Active', true)
+ON CONFLICT (id) DO UPDATE SET role = 'Employee', is_active = true;
 
-INSERT INTO employees (id, org_id, user_id, employee_code, first_name, last_name, email, dept_id, desig_id, skills, current_workload, availability_status, is_active)
+INSERT INTO employees (
+    id, org_id, user_id, employee_code, first_name, last_name, email,
+    dept_id, desig_id, skills, current_workload, availability_status,
+    date_of_joining, employment_type, status, salary, is_active
+)
 VALUES (
     'emp-sneha-6',
     'org-tasknera-ceo',
@@ -196,9 +253,13 @@ VALUES (
     ARRAY['Product Marketing', 'Brand Campaigns', 'PR Releases', 'Social Growth'],
     40,
     'AVAILABLE',
+    CURRENT_DATE,
+    'Full-Time',
+    'Active',
+    105000,
     true
 )
-ON CONFLICT (email) DO NOTHING;
+ON CONFLICT (id) DO NOTHING;
 
 -- 6. INITIAL OFFICIAL TASKS
 INSERT INTO work_tasks (
@@ -263,4 +324,3 @@ INSERT INTO executive_approval_requests (
     'PENDING'
 )
 ON CONFLICT (id) DO NOTHING;
-
