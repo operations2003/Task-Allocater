@@ -58,13 +58,13 @@ VALUES (
     'org-tasknera-ceo',
     'ceo@tasknera.com',
     '$2a$10$lkFvD5nJHHIWiYjTlJ6qhemZc/IO65PdkSgG7Ly8eFI0X40wNNVwq',
-    'Vikram',
-    'Malhotra',
+    'Sheetal',
+    'Bedi',
     'CEO',
     'Active',
     true
 )
-ON CONFLICT (id) DO UPDATE SET role = 'CEO', is_active = true, status = 'Active';
+ON CONFLICT (id) DO UPDATE SET first_name = 'Sheetal', last_name = 'Bedi', role = 'CEO', is_active = true, status = 'Active';
 
 INSERT INTO employees (
     id, org_id, user_id, employee_code, first_name, last_name, email,
@@ -76,8 +76,8 @@ VALUES (
     'org-tasknera-ceo',
     'user-ceo-1',
     'TN-EXEC-001',
-    'Vikram',
-    'Malhotra',
+    'Sheetal',
+    'Bedi',
     'ceo@tasknera.com',
     NULL,
     'desig-ceo',
@@ -90,7 +90,7 @@ VALUES (
     250000,
     true
 )
-ON CONFLICT (id) DO UPDATE SET desig_id = 'desig-ceo', is_active = true, status = 'Active';
+ON CONFLICT (id) DO UPDATE SET first_name = 'Sheetal', last_name = 'Bedi', desig_id = 'desig-ceo', is_active = true, status = 'Active';
 
 -- 5. SEED CROSS-DEPARTMENT EMPLOYEES (Eligible Task Assignees - CEO is excluded)
 -- Employee 1: Aarav Sharma (Engineering Lead)
