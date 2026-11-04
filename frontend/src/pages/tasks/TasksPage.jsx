@@ -174,11 +174,7 @@ export const TasksPage = () => {
     e.preventDefault();
     try {
       const isUserAdminCeo = isCeoOrAdmin(user);
-      const assigneeId = formData.assigneeId || (!isUserAdminCeo ? user.employeeId : null);
-      if (!assigneeId) {
-        toast.error('Please select an employee to assign this task to.');
-        return;
-      }
+      const assigneeId = formData.assigneeId || (!isUserAdminCeo ? user.employeeId : 'AUTO');
 
       const subtasks = formData.subtasksText
         .split('\n')
@@ -828,12 +824,12 @@ export const TasksPage = () => {
                     value={formData.assigneeId}
                     onChange={(e) => setFormData({ ...formData, assigneeId: e.target.value })}
                     className="w-full text-xs border border-slate-300 rounded-lg p-2.5 bg-white focus:outline-none"
-                    required={isCeoOrAdmin(user)}
+                    
                   >
                     {!isCeoOrAdmin(user) ? (
                       <option value="">Assign to myself</option>
                     ) : (
-                      <option value="">Select Employee...</option>
+                      <option value="">✨ Auto-Assign via AI (AI selects best employee)</option>
                     )}
                     {employees.map((emp) => (
                       <option key={emp.id} value={emp.id}>

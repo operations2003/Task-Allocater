@@ -1,8 +1,19 @@
 import { taskService } from '../services/taskService.js';
+import { ceoTaskService } from '../services/ceoTaskService.js';
 import { auditService } from '../services/auditService.js';
 import { sendSuccess, sendError } from '../utils/apiResponse.js';
 
 export const taskController = {
+  async createTask(req, res, next) {
+    try {
+      const orgId = req.user.orgId || 'org-tasknera-ceo';
+      const task = await ceoTaskService.createOfficialTask(orgId, req.user, req.body);
+      return sendSuccess(res, 'Task directive created and allocated successfully.', task, 201);
+    } catch (error) {
+      next(error);
+    }
+  },
+
   async listMyTasks(req, res, next) {
     try {
       const orgId = req.user.orgId || 'org-tasknera-ceo';

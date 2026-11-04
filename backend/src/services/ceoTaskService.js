@@ -1,6 +1,6 @@
 import { query } from '../config/db.js';
 import { nanoid } from 'nanoid';
-import { checkIsEmployeeCeoOrAdmin, isCeoOrAdmin } from '../utils/roleUtils.js';
+import { checkIsEmployeeCeoOrAdmin, isCeoOrAdmin, getCeoAdminExclusionSql } from '../utils/roleUtils.js';
 import { auditService } from './auditService.js';
 
 /**
@@ -228,6 +228,8 @@ export const ceoTaskService = {
   /**
    * Create official organizational task
    * Strict Rule: CEO must NEVER be an eligible assignee!
+   * Feature: If assigneeId is omitted or set to 'AUTO'/'AI', AI observes task details
+   * (title, description, domain, workload, skills) and automatically allocates the best team member.
    */
   async createOfficialTask(orgId, currentUser, payload) {
     const { title, description, assigneeId, deptId, priority = 'MEDIUM', dueDate, subtasks = [] } = payload;
@@ -235,24 +237,143 @@ export const ceoTaskService = {
     if (!title || !title.trim()) {
       throw new Error('Task title is required.');
     }
-    if (!assigneeId) {
-      throw new Error('An assigned employee is required.');
-    }
 
-    // STRICT BUSINESS RULE: CEO can NEVER be assigned tasks!
-    const isAssigneeCeo = await checkIsEmployeeCeoOrAdmin(assigneeId, orgId);
-    if (isAssigneeCeo) {
-      throw new Error('Executive Policy Violation: The CEO cannot be assigned organizational tasks.');
+    let finalAssigneeId = assigneeId;
+    let finalDeptId = deptId || null;
+    let assignmentSource = 'CEO';
+    let aiReasoning = null;
+
+    // ── AI Autonomous Allocation Observer ──────────────────────────────────
+    // If no assignee was chosen (or explicitly set to AUTO), AI selects the best team member
+    const isAutoAssign = !finalAssigneeId || finalAssigneeId === 'AUTO' || finalAssigneeId === 'AI' || finalAssigneeId === 'AI_AUTO';
+
+    if (isAutoAssign) {
+      // 1. Fetch all active non-CEO employees with skills, department, designation, and active tasks
+      const empQuery = `
+        SELECT e.id, e.first_name, e.last_name, e.email, e.skills, e.current_workload, e.availability_status,
+               e.dept_id, d.name AS dept_name, d.code AS dept_code,
+               ds.id AS desig_id, ds.title AS desig_title, ds.code AS desig_code,
+               COALESCE((
+                 SELECT COUNT(*) FROM work_tasks t 
+                 WHERE t.assignee_id = e.id AND t.status IN ('TODO', 'IN_PROGRESS', 'BLOCKED')
+               ), 0) AS active_tasks
+        FROM employees e
+        LEFT JOIN departments d ON e.dept_id = d.id
+        LEFT JOIN designations ds ON e.desig_id = ds.id
+        WHERE e.org_id = $1
+          AND e.is_active = true
+          AND ${getCeoAdminExclusionSql('e')}
+      `;
+      const empRes = await query(empQuery, [orgId]);
+      const candidates = empRes.rows;
+
+      if (candidates.length === 0) {
+        throw new Error('No eligible employees available for automated task allocation.');
+      }
+
+      // Department keyword sets for intelligent domain matching
+      const DEPT_KEYWORDS = {
+        IT: ['deploy', 'deployment', 'server', 'cloud', 'database', 'security', 'api', 'bug', 'code', 'network', 'system', 'software', 'hardware', 'it', 'git', 'release', 'infrastructure', 'test', 'script', 'fix', 'ci/cd', 'frontend', 'backend', 'devops', 'web', 'app', 'portal'],
+        TALENT: ['hiring', 'recruitment', 'recruit', 'interview', 'sourcing', 'candidate', 'resume', 'screening', 'talent', 'job', 'applicant', 'ats', 'headhunt', 'vacancy', 'outreach'],
+        HR_OPS: ['hr', 'operations', 'payroll', 'attendance', 'policy', 'leave', 'compliance', 'employee relations', 'onboarding', 'offboarding', 'contract', 'agreement', 'team lead', 'executive', 'admin', 'documentation'],
+        LD: ['training', 'learning', 'workshop', 'course', 'l&d', 'development', 'skill', 'trainer', 'session', 'coaching', 'upskilling', 'module', 'assessment', 'curriculum']
+      };
+
+      const textToAnalyze = `${title} ${description || ''}`.toLowerCase();
+
+      let bestCandidate = null;
+      let highestScore = -Infinity;
+
+      for (const emp of candidates) {
+        let score = 0;
+
+        // If user already specified a department, heavily prefer employees in that department
+        if (finalDeptId && emp.dept_id === finalDeptId) {
+          score += 150;
+        }
+
+        // Domain / Department keyword match
+        const deptCode = (emp.dept_code || '').toUpperCase();
+        const kwList = DEPT_KEYWORDS[deptCode] || [];
+        for (const kw of kwList) {
+          if (textToAnalyze.includes(kw)) {
+            score += 30;
+          }
+        }
+
+        // Skill array matching
+        const skills = Array.isArray(emp.skills) ? emp.skills : [];
+        for (const skill of skills) {
+          const sLower = String(skill).toLowerCase();
+          if (textToAnalyze.includes(sLower) || sLower.split(' ').some((w) => w.length > 3 && textToAnalyze.includes(w))) {
+            score += 40;
+          }
+        }
+
+        // Designation match
+        const desig = (emp.desig_title || '').toLowerCase();
+        if (desig.split(' ').some((w) => w.length > 3 && textToAnalyze.includes(w))) {
+          score += 25;
+        }
+
+        // Availability factor
+        if (emp.availability_status === 'AVAILABLE') {
+          score += 20;
+        } else if (emp.availability_status === 'ON_LEAVE') {
+          score -= 300;
+        }
+
+        // Workload & capacity balance (lower workload is prioritized)
+        score += Math.max(0, (100 - (emp.current_workload || 0)) * 0.4);
+        score -= parseInt(emp.active_tasks || '0', 10) * 10;
+
+        if (score > highestScore) {
+          highestScore = score;
+          bestCandidate = emp;
+        }
+      }
+
+      // Fallback to least loaded candidate if scoring was flat
+      if (!bestCandidate) {
+        bestCandidate = candidates.sort((a, b) => (a.current_workload || 0) - (b.current_workload || 0))[0];
+      }
+
+      finalAssigneeId = bestCandidate.id;
+      finalDeptId = finalDeptId || bestCandidate.dept_id;
+      assignmentSource = 'AI';
+      aiReasoning = `AI observed directive specifications ('${title.trim()}') and matched with ${bestCandidate.dept_name || 'Operational Team'}. Auto-assigned to ${bestCandidate.first_name} ${bestCandidate.last_name} (${bestCandidate.desig_title || 'Specialist'}) with current capacity ${100 - (bestCandidate.current_workload || 0)}% and ${bestCandidate.active_tasks} active task(s).`;
+    } else {
+      // Manual selection validation
+      const isAssigneeCeo = await checkIsEmployeeCeoOrAdmin(finalAssigneeId, orgId);
+      if (isAssigneeCeo) {
+        throw new Error('Executive Policy Violation: The CEO cannot be assigned organizational tasks.');
+      }
     }
 
     const id = `task-${nanoid(12)}`;
-    const creatorId = currentUser.employeeId;
+    const creatorId = currentUser.employeeId || 'emp-ceo-1';
 
-    const subtasksArray = Array.isArray(subtasks)
-      ? subtasks.map((st) => (typeof st === 'string' ? { title: st, completed: false } : st))
+    // Auto-generate milestone subtasks if none were supplied
+    let subtasksArray = Array.isArray(subtasks)
+      ? subtasks.map((st) => (typeof st === 'string' ? { title: st, completed: false } : st)).filter((s) => s.title && s.title.trim())
       : [];
 
-    const deadline = dueDate || null;
+    if (subtasksArray.length === 0) {
+      subtasksArray = [
+        { id: `sub-${Date.now()}-1`, title: `Analyze technical/operational scope for ${title.trim()}`, completed: false },
+        { id: `sub-${Date.now()}-2`, title: `Execute core milestones and delivery requirements`, completed: false },
+        { id: `sub-${Date.now()}-3`, title: `Verify output deliverables and submit status review`, completed: false },
+      ];
+    }
+
+    // Auto-generate reasonable deadline if omitted (URGENT: +2d, HIGH: +4d, MEDIUM: +7d, LOW: +10d)
+    let deadline = dueDate;
+    if (!deadline) {
+      const d = new Date();
+      const offsetDays = priority === 'URGENT' ? 2 : priority === 'HIGH' ? 4 : priority === 'LOW' ? 10 : 7;
+      d.setDate(d.getDate() + offsetDays);
+      deadline = d.toISOString().split('T')[0];
+    }
 
     const sql = `
       INSERT INTO work_tasks (
@@ -263,7 +384,7 @@ export const ceoTaskService = {
       ) VALUES (
         $1, $2, $3, $4, $5, $6, $7,
         $8, 'TODO', $9, $9, $9,
-        0, $10, 'CEO', $5, true,
+        0, $10, $11, $5, true,
         NOW(), NOW()
       )
       RETURNING *;
@@ -275,21 +396,48 @@ export const ceoTaskService = {
       title.trim(),
       description || '',
       creatorId,
-      assigneeId,
-      deptId || null,
+      finalAssigneeId,
+      finalDeptId,
       priority.toUpperCase(),
       deadline,
       JSON.stringify(subtasksArray),
+      assignmentSource,
     ]);
 
     const task = res.rows[0];
+
+    // If AI auto-allocated, record in ai_task_allocations table
+    if (assignmentSource === 'AI') {
+      try {
+        const allocId = `alloc-${nanoid(12)}`;
+        await query(
+          `INSERT INTO ai_task_allocations (
+            id, task_id, org_id, suggested_employee_id, department_id,
+            workload_score, availability_status, suggested_deadline,
+            suggested_subtasks, reasoning, status, allocated_by_system, created_at
+          ) VALUES ($1, $2, $3, $4, $5, 0, 'AVAILABLE', $6, $7, $8, 'APPROVED', true, NOW())`,
+          [
+            allocId,
+            id,
+            orgId,
+            finalAssigneeId,
+            finalDeptId,
+            deadline,
+            JSON.stringify(subtasksArray),
+            aiReasoning,
+          ]
+        );
+      } catch (allocErr) {
+        console.warn('Could not record ai_task_allocations entry:', allocErr.message);
+      }
+    }
 
     // Audit Log Entry
     await auditService.logEvent({
       taskId: id,
       orgId,
       actorId: creatorId,
-      actorName: `${currentUser.firstName || ''} ${currentUser.lastName || ''}`.trim() || 'CEO',
+      actorName: `${currentUser.firstName || ''} ${currentUser.lastName || ''}`.trim() || 'CEO (Sheetal Bedi)',
       actorType: 'CEO',
       action: 'CREATED',
       previousValues: {},
@@ -297,12 +445,17 @@ export const ceoTaskService = {
         title: task.title,
         priority: task.priority,
         assigneeId: task.assignee_id,
+        assignmentSource: task.assignment_source,
         dueDate: task.due_date,
       },
-      notes: 'Official organizational directive created by CEO.',
+      notes: aiReasoning || 'Official organizational directive created by CEO.',
     });
 
-    return task;
+    return {
+      ...task,
+      aiAllocated: assignmentSource === 'AI',
+      aiReasoning,
+    };
   },
 
   /**

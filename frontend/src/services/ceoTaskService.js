@@ -443,11 +443,21 @@ export const ceoTaskService = {
    * Official task creation by CEO
    */
   async createOfficialTask(data) {
-    return http.post('/v1/tasks', {
-      ...data,
-      isOfficial: true,
-      assignedBy: 'CEO',
-    });
+    try {
+      const res = await http.post('/v1/ceo/tasks', {
+        ...data,
+        isOfficial: true,
+        assignedBy: 'CEO',
+      });
+      return res.data || res;
+    } catch {
+      const fallback = await http.post('/v1/tasks', {
+        ...data,
+        isOfficial: true,
+        assignedBy: 'CEO',
+      });
+      return fallback.data || fallback;
+    }
   },
 
   /**

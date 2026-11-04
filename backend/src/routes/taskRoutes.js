@@ -6,8 +6,9 @@ const router = Router();
 
 router.use(authenticate);
 
-// Employee Scoped Task Operations
+// Employee & Executive Task Operations
 router.get('/', taskController.listMyTasks);
+router.post('/', taskController.createTask);
 router.get('/mine', taskController.listMyTasks);
 router.put('/:id/progress', taskController.updateProgress);
 router.post('/:id/request-extension', taskController.requestExtension);

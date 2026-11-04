@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ShieldCheck, Plus, Trash2, AlertCircle } from 'lucide-react';
+import { ShieldCheck, Plus, Trash2, AlertCircle, Sparkles, Bot } from 'lucide-react';
 import { Modal } from '../common/Modal.jsx';
 import { Button } from '../common/Button.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
@@ -72,7 +72,7 @@ export const CeoTaskCreateModal = ({
   const [formData, setFormData] = useState({
     title: '',
     description: '',
-    assigneeId: '',
+    assigneeId: '', // Default: empty string = AI Auto-Allocation
     deptId: '',
     priority: 'HIGH',
     dueDate: '',
@@ -85,7 +85,14 @@ export const CeoTaskCreateModal = ({
   // Reset form state whenever modal opens
   useEffect(() => {
     if (isOpen) {
-      setFormData({ title: '', description: '', assigneeId: '', deptId: '', priority: 'HIGH', dueDate: '' });
+      setFormData({
+        title: '',
+        description: '',
+        assigneeId: '',
+        deptId: '',
+        priority: 'HIGH',
+        dueDate: '',
+      });
       setSubtasks(['']);
       setError('');
       setFetchError('');
@@ -115,15 +122,7 @@ export const CeoTaskCreateModal = ({
     setError('');
 
     if (!formData.title.trim()) {
-      setError('Please provide a task title.');
-      return;
-    }
-    if (!formData.assigneeId) {
-      setError('Please select an assignee.');
-      return;
-    }
-    if (!formData.dueDate) {
-      setError('Please specify a due date.');
+      setError('Please provide a directive title.');
       return;
     }
 
@@ -134,8 +133,10 @@ export const CeoTaskCreateModal = ({
         .filter(Boolean)
         .map((title, idx) => ({ id: `sub-${Date.now()}-${idx}`, title, completed: false }));
 
+      // If user left assignee blank, it triggers AI Auto-Allocation
       await onSubmit({
         ...formData,
+        assigneeId: formData.assigneeId || 'AUTO',
         subtasks: filteredSubtasks,
         isOfficial: true,
         assignedBy: 'CEO',
@@ -145,7 +146,7 @@ export const CeoTaskCreateModal = ({
       setSubtasks(['']);
       onClose();
     } catch (err) {
-      setError(err.message || 'Failed to create task.');
+      setError(err.message || 'Failed to issue task directive.');
     } finally {
       setIsSubmitting(false);
     }
@@ -153,47 +154,47 @@ export const CeoTaskCreateModal = ({
 
   // CEO display name (dynamic from auth context)
   const ceoName = user
-    ? `${user.firstName || user.first_name || ''} ${user.lastName || user.last_name || ''}`.trim() || 'CEO'
-    : 'CEO';
+    ? `${user.firstName || user.first_name || ''} ${user.lastName || user.last_name || ''}`.trim() || 'CEO (Sheetal Bedi)'
+    : 'CEO (Sheetal Bedi)';
 
   return (
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="New Task"
-      subtitle="Assign a task to any team member"
-      maxWidth="max-w-xl"
+      title="Create Organizational Task Directive"
+      subtitle="AI will observe task scope and automatically assign the optimal team member"
+      maxWidth="max-w-2xl"
     >
       <form onSubmit={handleSubmit} className="p-6 space-y-4">
         {/* CEO Directive Banner & Assigner Identification */}
         <div className="space-y-3">
-          <div className="flex items-center gap-2.5 p-3 rounded-xl bg-brand-50 dark:bg-brand-950/40 border border-brand-200 dark:border-brand-900/60 text-brand-800 dark:text-brand-200 text-xs">
-            <ShieldCheck className="w-5 h-5 text-brand-600 dark:text-brand-400 shrink-0" />
+          <div className="flex items-center gap-2.5 p-3 rounded-xl bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-900/60 text-purple-900 dark:text-purple-200 text-xs">
+            <Bot className="w-5 h-5 text-purple-600 dark:text-purple-400 shrink-0" />
             <span>
-              <strong>Official Executive Directive:</strong> As CEO, tasks assigned here bypass reporting
-              hierarchies and are issued company-wide with highest priority visibility.
+              <strong>AI Auto-Allocation Active:</strong> Simply specify your task directive and description.
+              The AI engine will observe the requirements, match skills & workload, and automatically assign the best team member.
             </span>
           </div>
 
-          <div className="flex items-center justify-between p-3 rounded-xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80">
+          <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80">
             <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-full bg-brand-600 text-white flex items-center justify-center font-black text-xs shadow-sm">
+              <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center font-bold text-xs shadow-xs">
                 CEO
               </div>
               <div>
                 <div className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400 tracking-wider">
-                  Assigned By (Task Issuer)
+                  Task Issuer (CEO Authority)
                 </div>
                 <div className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
                   <span>{ceoName}</span>
-                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-brand-100 text-brand-800 dark:bg-brand-950 dark:text-brand-300 border border-brand-200 dark:border-brand-800">
+                  <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300">
                     Chief Executive Officer
                   </span>
                 </div>
               </div>
             </div>
             <div className="text-right text-[11px] text-slate-500 dark:text-slate-400 font-semibold hidden sm:block">
-              Executive Authority
+              Executive Directives
             </div>
           </div>
         </div>
@@ -216,7 +217,7 @@ export const CeoTaskCreateModal = ({
             required
             value={formData.title}
             onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-            placeholder="e.g. Update infrastructure documentation"
+            placeholder="e.g. Work on new project deployment"
             className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-lg text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900"
           />
         </div>
@@ -224,23 +225,23 @@ export const CeoTaskCreateModal = ({
         {/* Description */}
         <div>
           <label className="block text-xs font-semibold text-slate-700 mb-1">
-            Description
+            Description & Scope
           </label>
           <textarea
             rows="3"
             value={formData.description}
             onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-            placeholder="Key deliverables, requirements, or links..."
+            placeholder="Describe deliverables, requirements or technical scope. AI uses this to match the most suitable employee..."
             className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-lg text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900"
           />
         </div>
 
         {/* 2-column Grid: Target Department & Assignee */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {/* Department Filter */}
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1">
-              Department
+              Department <span className="text-slate-400 font-normal">(Optional — AI can infer)</span>
             </label>
             <select
               value={formData.deptId}
@@ -249,12 +250,11 @@ export const CeoTaskCreateModal = ({
                 setFormData((prev) => ({
                   ...prev,
                   deptId: newDeptId,
-                  assigneeId: '', // reset assignee when dept changes
                 }));
               }}
-              className="w-full px-3 py-2 text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500"
+              className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900"
             >
-              <option value="">All Departments</option>
+              <option value="">All / Auto-Detect by AI</option>
               {activeDepartments.map((dept) => (
                 <option key={dept.id || dept.dept_id} value={dept.id || dept.dept_id}>
                   {dept.name}
@@ -263,18 +263,15 @@ export const CeoTaskCreateModal = ({
             </select>
           </div>
 
-          {/* Assignee Dropdown — Department-Categorized */}
+          {/* Assignee Selection (Optional - AI Auto by Default) */}
           <div>
-            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1 flex items-center justify-between">
-              <span>
-                Assign To (Team Member) <span className="text-rose-500">*</span>
-              </span>
-              <span className="text-[10px] font-medium text-slate-400 normal-case">
-                {filteredAssignees.length} Available
+            <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center justify-between">
+              <span>Assign To</span>
+              <span className="text-[10px] font-medium text-purple-600 dark:text-purple-400 normal-case flex items-center gap-1">
+                <Sparkles className="w-3 h-3" /> Auto-Assigned by AI
               </span>
             </label>
             <select
-              required
               value={formData.assigneeId}
               onChange={(e) => {
                 const emp = activeEmployees.find((x) => x.id === e.target.value);
@@ -286,13 +283,9 @@ export const CeoTaskCreateModal = ({
               }}
               className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900"
             >
-              <option value="">
-                {nonCeoStaff.length === 0
-                  ? 'Loading staff...'
-                  : 'Select Operational Assignee'}
-              </option>
+              <option value="">✨ Auto-Assign via AI Engine (Recommended)</option>
 
-              {/* Group employees by department */}
+              {/* Group employees by department for optional manual override */}
               {activeDepartments.map((dept) => {
                 const deptId = dept.id || dept.dept_id;
                 const deptMembers = filteredAssignees.filter((emp) => {
@@ -303,7 +296,7 @@ export const CeoTaskCreateModal = ({
                 if (deptMembers.length === 0) return null;
 
                 return (
-                  <optgroup key={deptId} label={`── ${dept.name} ──`}>
+                  <optgroup key={deptId} label={`── ${dept.name} (Manual Override) ──`}>
                     {deptMembers.map((emp) => {
                       const name =
                         emp.fullName ||
@@ -317,28 +310,13 @@ export const CeoTaskCreateModal = ({
                         'Specialist';
                       return (
                         <option key={emp.id} value={emp.id}>
-                          {name} {desig ? `— ${desig}` : ''}
+                          {name} — {desig}
                         </option>
                       );
                     })}
                   </optgroup>
                 );
               })}
-
-              {/* Staff without department mapping (fallback) */}
-              {filteredAssignees.filter(
-                (e) => !e.dept_id && !e.deptId && !e.dept_name && !e.department_id
-              ).length > 0 && (
-                <optgroup label="── General Staff ──">
-                  {filteredAssignees
-                    .filter((e) => !e.dept_id && !e.deptId && !e.dept_name && !e.department_id)
-                    .map((emp) => (
-                      <option key={emp.id} value={emp.id}>
-                        {emp.first_name} {emp.last_name}
-                      </option>
-                    ))}
-                </optgroup>
-              )}
             </select>
           </div>
         </div>
@@ -354,7 +332,7 @@ export const CeoTaskCreateModal = ({
               onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
               className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900"
             >
-              <option value="URGENT">Urgent</option>
+              <option value="URGENT">Urgent (CEO Directive)</option>
               <option value="HIGH">High</option>
               <option value="MEDIUM">Medium</option>
               <option value="LOW">Low</option>
@@ -363,13 +341,12 @@ export const CeoTaskCreateModal = ({
 
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1">
-              Due Date <span className="text-rose-500">*</span>
+              Due Date <span className="text-slate-400 font-normal">(Optional — AI sets default)</span>
             </label>
             <input
               type="date"
-              required
-              value={formData.dueDate}
               min={new Date().toISOString().split('T')[0]}
+              value={formData.dueDate}
               onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
               className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900"
             />
@@ -380,7 +357,7 @@ export const CeoTaskCreateModal = ({
         <div className="space-y-2 pt-2 border-t border-slate-200 dark:border-slate-800">
           <div className="flex items-center justify-between">
             <label className="block text-xs font-semibold text-slate-700">
-              Subtasks (optional)
+              Subtasks <span className="text-slate-400 font-normal">(Optional — AI generates milestones if empty)</span>
             </label>
             <button
               type="button"
@@ -399,7 +376,7 @@ export const CeoTaskCreateModal = ({
                   type="text"
                   value={st}
                   onChange={(e) => handleSubtaskChange(idx, e.target.value)}
-                  placeholder={`Step ${idx + 1}...`}
+                  placeholder={`Milestone ${idx + 1}...`}
                   className="flex-1 px-2.5 py-1.5 text-xs bg-white border border-slate-300 rounded-md text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900"
                 />
                 {subtasks.length > 1 && (
@@ -424,9 +401,14 @@ export const CeoTaskCreateModal = ({
           <button
             type="submit"
             disabled={isSubmitting}
-            className="px-4 py-2 rounded-lg bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800 transition-colors shadow-xs cursor-pointer disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800 transition-colors shadow-xs cursor-pointer disabled:opacity-50"
           >
-            {isSubmitting ? 'Creating...' : 'Create Task'}
+            <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+            {isSubmitting
+              ? 'Allocating with AI...'
+              : formData.assigneeId
+              ? 'Create Task'
+              : 'Create & Auto-Assign with AI'}
           </button>
         </div>
       </form>
