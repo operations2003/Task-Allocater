@@ -123,6 +123,11 @@ export const ceoTaskService = {
     }
   },
 
+  async autoDispatchAll() {
+    const res = await http.post('/v1/ceo/tasks/auto-dispatch-all');
+    return res.data || res;
+  },
+
   async generateRoleTasks() {
     const res = await http.post('/v1/ceo/tasks/generate-role-tasks');
     return res.data || res;

@@ -28,6 +28,7 @@ router.get('/:id/audit-trail', ceoTaskController.getTaskAuditTrail);
 router.get('/ai-allocations', ceoTaskController.listAiAllocations);
 router.post('/ai-allocations/:id/action', ceoTaskController.actOnAiAllocation);
 router.post('/generate-role-tasks', ceoTaskController.generateRoleTasks);
+router.post('/auto-dispatch-all', ceoTaskController.autoDispatchAll);
 router.get('/role-task-catalog', ceoTaskController.getRoleTaskCatalog);
 
 // Pending Directives & Daily Reporting

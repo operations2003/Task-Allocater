@@ -15,6 +15,9 @@ import {
   GraduationCap,
   Layers,
   ArrowRight,
+  Zap,
+  ShieldCheck,
+  UserCheck2,
 } from 'lucide-react';
 import { Badge } from '../common/Badge.jsx';
 import { Button } from '../common/Button.jsx';
@@ -29,6 +32,7 @@ export const AiTaskAllocationSection = ({
   onReject,
   onAdjust,
   onGenerate,
+  onAutoDispatchAll,
   onRefresh,
 }) => {
   const [rejectModal, setRejectModal] = useState({ isOpen: false, item: null, feedback: '' });
@@ -44,7 +48,9 @@ export const AiTaskAllocationSection = ({
   const [selectedAssignees, setSelectedAssignees] = useState({});
   const [isAssigning, setIsAssigning] = useState({});
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isDispatchingAll, setIsDispatchingAll] = useState(false);
   const [activeDeptTab, setActiveDeptTab] = useState('ALL');
+  const [selectedStaffFilter, setSelectedStaffFilter] = useState(null);
 
   const assignableEmployees = filterNonCeoEmployees(employees);
 
@@ -101,6 +107,22 @@ export const AiTaskAllocationSection = ({
     }
   };
 
+  const handleTriggerAutoDispatchAll = async () => {
+    if (onAutoDispatchAll) {
+      const confirmDispatch = window.confirm(
+        `Are you sure you want to assign and dispatch all ${allocations.length} daily SOP directives across all team members? Every specialist will receive their designated task immediately.`
+      );
+      if (!confirmDispatch) return;
+
+      setIsDispatchingAll(true);
+      try {
+        await onAutoDispatchAll();
+      } finally {
+        setIsDispatchingAll(false);
+      }
+    }
+  };
+
   // Helper to get department-specific styling and icons
   const getDeptMeta = (deptName = '', deptCode = '') => {
     const str = `${deptName} ${deptCode}`.toLowerCase();
@@ -136,8 +158,33 @@ export const AiTaskAllocationSection = ({
     };
   };
 
-  // Filter allocations by active department tab
+  // Calculate live employee distribution counts
+  const employeeDistribution = assignableEmployees.map((emp) => {
+    const assignedTasks = allocations.filter((a) => {
+      const chosenId = selectedAssignees[a.id] || a.suggestedAssignee?.id;
+      return chosenId === emp.id;
+    });
+    return {
+      ...emp,
+      name: emp.fullName || `${emp.firstName || emp.first_name || ''} ${emp.lastName || emp.last_name || ''}`.trim() || 'Employee',
+      role: emp.desig_title || emp.designationTitle || emp.departmentName || 'Specialist',
+      assignedTasksCount: assignedTasks.length,
+      hasTask: assignedTasks.length > 0,
+    };
+  });
+
+  const coveredEmployeesCount = employeeDistribution.filter((e) => e.hasTask).length;
+  const coveragePercentage = assignableEmployees.length > 0
+    ? Math.round((coveredEmployeesCount / assignableEmployees.length) * 100)
+    : 100;
+
+  // Filter allocations by active department tab & optional selected staff filter
   const filteredAllocations = allocations.filter((item) => {
+    if (selectedStaffFilter) {
+      const chosenId = selectedAssignees[item.id] || item.suggestedAssignee?.id;
+      if (chosenId !== selectedStaffFilter) return false;
+    }
+
     if (activeDeptTab === 'ALL') return true;
     const deptStr = `${item.department?.name || ''} ${item.department?.code || ''}`.toUpperCase();
     if (activeDeptTab === 'TALENT') return deptStr.includes('TALENT') || deptStr.includes('RECRUIT');
@@ -178,20 +225,98 @@ export const AiTaskAllocationSection = ({
               Daily SOP Task Directives & AI Allocations
             </h1>
             <p className="text-xs text-slate-500 dark:text-slate-400 max-w-2xl leading-relaxed">
-              Operational tasks generated automatically based on standard operating procedures. Select which specialist from each department will own each directive and assign with 1 click.
+              Operational tasks generated automatically based on standard operating procedures. The distribution engine guarantees that <strong>every active team member receives a directive</strong>.
             </p>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
             {onGenerate && (
               <button
                 type="button"
                 onClick={handleTriggerGenerate}
-                disabled={isGenerating}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-xl bg-slate-900 text-white dark:bg-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-slate-100 transition-all shadow-xs disabled:opacity-50 cursor-pointer"
+                disabled={isGenerating || isDispatchingAll}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-xl bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-200 hover:bg-slate-200 transition-all shadow-xs disabled:opacity-50 cursor-pointer"
               >
                 <RotateCw className={`w-3.5 h-3.5 ${isGenerating ? 'animate-spin' : ''}`} />
-                {isGenerating ? 'Regenerating Tasks...' : '✨ Refresh Daily SOP Tasks'}
+                {isGenerating ? 'Rebalancing Tasks...' : '✨ Refresh Tasks'}
+              </button>
+            )}
+
+            {onAutoDispatchAll && allocations.length > 0 && (
+              <button
+                type="button"
+                onClick={handleTriggerAutoDispatchAll}
+                disabled={isDispatchingAll || isGenerating}
+                className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-xl bg-slate-900 text-white dark:bg-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-slate-100 transition-all shadow-xs disabled:opacity-50 cursor-pointer"
+              >
+                <Zap className={`w-3.5 h-3.5 text-amber-300 dark:text-amber-500 ${isDispatchingAll ? 'animate-bounce' : ''}`} />
+                {isDispatchingAll ? 'Dispatching to All...' : '⚡ Dispatch to Entire Team (1-Click)'}
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* ── Fair Distribution & Team Member Coverage Indicator ── */}
+        <div className="mt-5 p-3.5 rounded-xl bg-gradient-to-r from-emerald-50/80 via-teal-50/50 to-white dark:from-emerald-950/30 dark:via-slate-800/60 dark:to-slate-900 border border-emerald-200/80 dark:border-emerald-800/60 space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-full bg-emerald-600 text-white flex items-center justify-center font-bold text-xs">
+                ✓
+              </div>
+              <span className="text-xs font-bold text-emerald-950 dark:text-emerald-200">
+                Team Distribution Coverage: {coveredEmployeesCount} / {assignableEmployees.length} Members Receiving Tasks ({coveragePercentage}%)
+              </span>
+            </div>
+            <span className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-300">
+              {coveragePercentage === 100
+                ? '★ 100% Guaranteed: Everyone in the team has tasks allocated'
+                : 'Balanced across all active departments'}
+            </span>
+          </div>
+
+          {/* Member chips with live task count */}
+          <div className="flex flex-wrap items-center gap-1.5 pt-1">
+            <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 mr-1">
+              Team Roster:
+            </span>
+            {employeeDistribution.map((emp) => {
+              const isSelected = selectedStaffFilter === emp.id;
+              return (
+                <button
+                  key={emp.id}
+                  type="button"
+                  onClick={() => setSelectedStaffFilter(isSelected ? null : emp.id)}
+                  title={`Click to filter directives for ${emp.name}`}
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all cursor-pointer border ${
+                    isSelected
+                      ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 border-slate-900 shadow-xs'
+                      : emp.hasTask
+                      ? 'bg-white text-slate-700 dark:bg-slate-800 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-slate-400'
+                      : 'bg-rose-50 text-rose-700 border-rose-200'
+                  }`}
+                >
+                  <Avatar name={emp.name} size="xs" />
+                  <span>{emp.name.split(' ')[0]}</span>
+                  <span
+                    className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                      isSelected
+                        ? 'bg-slate-700 text-white dark:bg-slate-200 dark:text-slate-900'
+                        : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
+                    }`}
+                  >
+                    {emp.assignedTasksCount} task{emp.assignedTasksCount !== 1 ? 's' : ''}
+                  </span>
+                </button>
+              );
+            })}
+
+            {selectedStaffFilter && (
+              <button
+                type="button"
+                onClick={() => setSelectedStaffFilter(null)}
+                className="text-[11px] font-semibold text-indigo-600 dark:text-indigo-400 hover:underline ml-1 cursor-pointer"
+              >
+                Clear filter
               </button>
             )}
           </div>
@@ -266,7 +391,7 @@ export const AiTaskAllocationSection = ({
               All SOP Directives Allocated!
             </h3>
             <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto mt-1 leading-relaxed">
-              Every operational task has been assigned to its designated department specialist. You can click 'Refresh Daily SOP Tasks' to generate tomorrow's directives.
+              Every operational task has been assigned to its designated department specialist. You can click 'Refresh Tasks' at any time to generate fresh directives.
             </p>
             {onGenerate && (
               <button

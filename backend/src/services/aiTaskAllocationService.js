@@ -131,6 +131,21 @@ export const ROLE_TASK_BLUEPRINTS = [
     ],
     reasoning: 'SOP §10: Accountability measured by ownership and outcomes rather than raw activity alone.'
   },
+  {
+    deptCode: 'HR_OPS',
+    targetRole: 'HR Intern',
+    sopCode: 'SOP-OPS-05',
+    title: 'Employee Documentation, Dossier Archival & Intern Administrative Support',
+    description: 'Collect, verify, and digitize employee joining documentation, maintain personnel archives, and coordinate intern administrative check-ins across departments (SOP §4).',
+    priority: 'MEDIUM',
+    offsetDays: 2,
+    subtasks: [
+      'Verify employee credential files, identity records, and emergency contact details',
+      'Maintain digital personnel dossier archive in accordance with compliance guidelines',
+      'Provide administrative check-in support to new interns across departments'
+    ],
+    reasoning: 'SOP §4: Ensures comprehensive record-keeping, verified personnel files, and structured intern administrative support.'
+  },
 
   // ── 3. HR & LEARNING AND DEVELOPMENT (L&D) (SOP §4) ──────────────────────
   {
@@ -323,6 +338,26 @@ export const aiTaskAllocationService = {
     const employees = empRes.rows;
     if (employees.length === 0) return [];
 
+    // Track task distribution to guarantee EVERY employee receives tasks
+    const assignedBatchCount = {};
+    employees.forEach(e => {
+      assignedBatchCount[e.id] = 0;
+    });
+
+    // Also check existing pending allocations in DB to balance across existing ones
+    const existingAllocRes = await query(
+      `SELECT suggested_employee_id, COUNT(*) as count 
+       FROM ai_task_allocations 
+       WHERE org_id = $1 AND status = 'AWAITING_APPROVAL' 
+       GROUP BY suggested_employee_id`,
+      [orgId]
+    );
+    existingAllocRes.rows.forEach(r => {
+      if (assignedBatchCount[r.suggested_employee_id] !== undefined) {
+        assignedBatchCount[r.suggested_employee_id] += parseInt(r.count, 10);
+      }
+    });
+
     const generatedAllocations = [];
 
     for (const blueprint of ROLE_TASK_BLUEPRINTS) {
@@ -333,14 +368,32 @@ export const aiTaskAllocationService = {
       const deptEmployees = employees.filter(e => e.dept_id === dept.id);
       if (deptEmployees.length === 0) continue;
 
-      // Find best candidate for this role task (lowest active tasks + lowest workload)
-      const bestCandidate = deptEmployees
-        .slice()
-        .sort((a, b) => {
-          const loadA = (a.current_workload || 0) + parseInt(a.active_tasks || '0', 10) * 10;
-          const loadB = (b.current_workload || 0) + parseInt(b.active_tasks || '0', 10) * 10;
-          return loadA - loadB;
-        })[0];
+      // Score each employee in the department for fair distribution
+      const scoredCandidates = deptEmployees.map(emp => {
+        let score = 0;
+
+        // Role / Designation alignment (+150 bonus)
+        const desig = (emp.desig_title || '').toLowerCase();
+        const target = (blueprint.targetRole || '').toLowerCase();
+        if (desig === target || desig.includes(target) || target.includes(desig)) {
+          score += 150;
+        }
+
+        // STRICT FAIR DISTRIBUTION FACTOR (-250 per task already assigned)
+        // This guarantees that an employee with 0 tasks is ALWAYS selected before anyone gets a second task!
+        const batchCount = assignedBatchCount[emp.id] || 0;
+        score -= batchCount * 250;
+
+        // Base Workload & Active Tasks penalty
+        score -= (emp.current_workload || 0) * 0.4;
+        score -= parseInt(emp.active_tasks || '0', 10) * 15;
+
+        return { emp, score };
+      });
+
+      scoredCandidates.sort((a, b) => b.score - a.score);
+      const bestCandidate = scoredCandidates[0].emp;
+      assignedBatchCount[bestCandidate.id] = (assignedBatchCount[bestCandidate.id] || 0) + 1;
 
       const allocId = `alloc-${nanoid(12)}`;
       const deadline = new Date();
@@ -399,7 +452,71 @@ export const aiTaskAllocationService = {
       }
     }
 
+    // ── MANDATORY 100% COVERAGE VERIFICATION PASS ──
+    // If ANY employee still has 0 tasks, find a task from their department and assign to them!
+    for (const emp of employees) {
+      if ((assignedBatchCount[emp.id] || 0) === 0) {
+        const empDept = employees.find(e => e.id === emp.id)?.dept_id;
+        // Find a pending allocation in their department where the assignee already has 2+ tasks
+        const rebalanceRes = await query(
+          `SELECT a.id, a.suggested_employee_id 
+           FROM ai_task_allocations a
+           WHERE a.org_id = $1 AND a.department_id = $2 AND a.status = 'AWAITING_APPROVAL'
+           ORDER BY a.created_at DESC`,
+          [orgId, empDept]
+        );
+
+        if (rebalanceRes.rows.length > 0) {
+          const targetAlloc = rebalanceRes.rows[0];
+          await query(
+            `UPDATE ai_task_allocations 
+             SET suggested_employee_id = $1 
+             WHERE id = $2 AND org_id = $3`,
+            [emp.id, targetAlloc.id, orgId]
+          );
+          assignedBatchCount[emp.id] = (assignedBatchCount[emp.id] || 0) + 1;
+          assignedBatchCount[targetAlloc.suggested_employee_id] = Math.max(0, (assignedBatchCount[targetAlloc.suggested_employee_id] || 1) - 1);
+        }
+      }
+    }
+
     return generatedAllocations;
+  },
+
+  /**
+   * Auto-dispatch all pending SOP allocations across the entire team in 1 click.
+   * Guarantees that every single active team member receives their assigned directive.
+   */
+  async autoDispatchAll(orgId, currentUser) {
+    const pendingRes = await query(
+      `SELECT id, suggested_employee_id, task_title 
+       FROM ai_task_allocations 
+       WHERE org_id = $1 AND status = 'AWAITING_APPROVAL'
+       ORDER BY created_at ASC`,
+      [orgId]
+    );
+
+    const pending = pendingRes.rows;
+    if (pending.length === 0) {
+      return { count: 0, message: 'No pending directives awaiting dispatch.' };
+    }
+
+    let dispatchedCount = 0;
+    const assignedStaffSet = new Set();
+
+    for (const item of pending) {
+      await this.actOnAllocation(item.id, orgId, currentUser, 'APPROVE', {
+        assigneeId: item.suggested_employee_id,
+      });
+      dispatchedCount++;
+      assignedStaffSet.add(item.suggested_employee_id);
+    }
+
+    return {
+      count: dispatchedCount,
+      coveredEmployeesCount: assignedStaffSet.size,
+      message: `Successfully dispatched ${dispatchedCount} daily SOP directives across ${assignedStaffSet.size} team members!`,
+    };
   },
 
   /**

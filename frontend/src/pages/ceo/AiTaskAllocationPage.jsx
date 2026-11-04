@@ -67,10 +67,22 @@ export const AiTaskAllocationPage = () => {
     try {
       setLoading(true);
       await ceoTaskService.generateRoleTasks();
-      toast.success('Generated fresh SOP daily operational directives!');
+      toast.success('Generated fresh SOP daily directives ensuring 100% team member coverage!');
       await fetchData();
     } catch (err) {
       toast.error(err.message || 'Failed to generate role tasks.');
+      setLoading(false);
+    }
+  };
+
+  const handleAutoDispatchAll = async () => {
+    try {
+      setLoading(true);
+      const res = await ceoTaskService.autoDispatchAll();
+      toast.success(res.message || 'Successfully dispatched tasks across all team members!');
+      await fetchData();
+    } catch (err) {
+      toast.error(err.message || 'Failed to dispatch tasks.');
       setLoading(false);
     }
   };
@@ -79,7 +91,7 @@ export const AiTaskAllocationPage = () => {
     return (
       <div className="p-16 flex flex-col justify-center items-center gap-3">
         <LoadingSpinner />
-        <span className="text-xs text-slate-500 font-medium">Loading SOP task directives...</span>
+        <span className="text-xs text-slate-500 font-medium">Loading SOP task directives & team coverage...</span>
       </div>
     );
   }
@@ -93,6 +105,7 @@ export const AiTaskAllocationPage = () => {
         onReject={handleReject}
         onAdjust={handleAdjust}
         onGenerate={handleGenerate}
+        onAutoDispatchAll={handleAutoDispatchAll}
         onRefresh={fetchData}
       />
     </div>

@@ -160,6 +160,16 @@ export const ceoTaskController = {
     }
   },
 
+  async autoDispatchAll(req, res, next) {
+    try {
+      const orgId = req.user.orgId || 'org-tasknera-ceo';
+      const data = await aiTaskAllocationService.autoDispatchAll(orgId, req.user);
+      return sendSuccess(res, data.message, data);
+    } catch (error) {
+      next(error);
+    }
+  },
+
   async actOnAiAllocation(req, res, next) {
     try {
       const { id } = req.params;
