@@ -4,14 +4,20 @@
 -- =====================================================================
 
 -- 1. ORGANIZATIONS
-ALTER TABLE organizations ADD COLUMN IF NOT EXISTS domain VARCHAR(100);
 CREATE TABLE IF NOT EXISTS organizations (
     id VARCHAR(50) PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
+    code VARCHAR(50),
+    email VARCHAR(255),
+    status VARCHAR(50) DEFAULT 'Active',
     domain VARCHAR(100),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+ALTER TABLE organizations ADD COLUMN IF NOT EXISTS code VARCHAR(50);
+ALTER TABLE organizations ADD COLUMN IF NOT EXISTS email VARCHAR(255);
+ALTER TABLE organizations ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'Active';
+ALTER TABLE organizations ADD COLUMN IF NOT EXISTS domain VARCHAR(100);
 
 -- 2. DEPARTMENTS
 CREATE TABLE IF NOT EXISTS departments (
@@ -39,14 +45,20 @@ CREATE TABLE IF NOT EXISTS users (
     org_id VARCHAR(50) NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
     email VARCHAR(255) NOT NULL UNIQUE,
     password_hash VARCHAR(255) NOT NULL,
+    first_name VARCHAR(100),
+    last_name VARCHAR(100),
     role VARCHAR(30) NOT NULL DEFAULT 'Employee',
+    status VARCHAR(50) DEFAULT 'Active',
     is_active BOOLEAN NOT NULL DEFAULT true,
     last_login_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+ALTER TABLE users ADD COLUMN IF NOT EXISTS first_name VARCHAR(100);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS last_name VARCHAR(100);
 ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(30) DEFAULT 'Employee';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'Active';
 ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMPTZ;
 
@@ -70,12 +82,20 @@ CREATE TABLE IF NOT EXISTS employees (
     skills TEXT[] DEFAULT '{}',
     current_workload INT NOT NULL DEFAULT 0,
     availability_status VARCHAR(30) NOT NULL DEFAULT 'AVAILABLE',
+    date_of_joining DATE DEFAULT CURRENT_DATE,
+    employment_type VARCHAR(50) DEFAULT 'Full-Time',
+    salary NUMERIC(12,2) DEFAULT 0,
+    status VARCHAR(50) DEFAULT 'Active',
     avatar_url TEXT,
     is_active BOOLEAN NOT NULL DEFAULT true,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS date_of_joining DATE DEFAULT CURRENT_DATE;
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS employment_type VARCHAR(50) DEFAULT 'Full-Time';
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS salary NUMERIC(12,2) DEFAULT 0;
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'Active';
 ALTER TABLE employees ADD COLUMN IF NOT EXISTS skills TEXT[] DEFAULT '{}';
 ALTER TABLE employees ADD COLUMN IF NOT EXISTS current_workload INT DEFAULT 0;
 ALTER TABLE employees ADD COLUMN IF NOT EXISTS availability_status VARCHAR(30) DEFAULT 'AVAILABLE';
