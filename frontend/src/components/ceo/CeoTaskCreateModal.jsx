@@ -241,7 +241,7 @@ export const CeoTaskCreateModal = ({
           {/* Department Filter */}
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1">
-              Department <span className="text-slate-400 font-normal">(Optional — AI can infer)</span>
+              Department <span className="text-slate-400 font-normal">(AI isolates to this department)</span>
             </label>
             <select
               value={formData.deptId}
@@ -250,11 +250,12 @@ export const CeoTaskCreateModal = ({
                 setFormData((prev) => ({
                   ...prev,
                   deptId: newDeptId,
+                  assigneeId: '', // Reset to auto-assign 1 person in the newly selected department
                 }));
               }}
               className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900"
             >
-              <option value="">All / Auto-Detect by AI</option>
+              <option value="">All Departments (AI auto-detects department)</option>
               {activeDepartments.map((dept) => (
                 <option key={dept.id || dept.dept_id} value={dept.id || dept.dept_id}>
                   {dept.name}
@@ -263,12 +264,12 @@ export const CeoTaskCreateModal = ({
             </select>
           </div>
 
-          {/* Assignee Selection (Optional - AI Auto by Default) */}
+          {/* Assignee Selection (Strictly 1 Person) */}
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center justify-between">
-              <span>Assign To</span>
+              <span>Assign To (1 Person Only)</span>
               <span className="text-[10px] font-medium text-purple-600 dark:text-purple-400 normal-case flex items-center gap-1">
-                <Sparkles className="w-3 h-3" /> Auto-Assigned by AI
+                <Sparkles className="w-3 h-3" /> Assigned to 1 person
               </span>
             </label>
             <select
@@ -283,40 +284,46 @@ export const CeoTaskCreateModal = ({
               }}
               className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900"
             >
-              <option value="">✨ Auto-Assign via AI Engine (Recommended)</option>
+              <option value="">
+                {formData.deptId
+                  ? `✨ Auto-Assign 1 person from ${activeDepartments.find((d) => (d.id || d.dept_id) === formData.deptId)?.name || 'this department'} (AI Recommended)`
+                  : '✨ Auto-Assign 1 optimal person (AI selects department & person)'}
+              </option>
 
-              {/* Group employees by department for optional manual override */}
-              {activeDepartments.map((dept) => {
-                const deptId = dept.id || dept.dept_id;
-                const deptMembers = filteredAssignees.filter((emp) => {
-                  const empDept = emp.dept_id || emp.deptId || emp.department_id;
-                  return empDept === deptId || (emp.dept_name && emp.dept_name === dept.name);
-                });
+              {/* Group employees by department for optional manual single-person override */}
+              {activeDepartments
+                .filter((dept) => !formData.deptId || (dept.id || dept.dept_id) === formData.deptId)
+                .map((dept) => {
+                  const deptId = dept.id || dept.dept_id;
+                  const deptMembers = filteredAssignees.filter((emp) => {
+                    const empDept = emp.dept_id || emp.deptId || emp.department_id;
+                    return empDept === deptId || (emp.dept_name && emp.dept_name === dept.name);
+                  });
 
-                if (deptMembers.length === 0) return null;
+                  if (deptMembers.length === 0) return null;
 
-                return (
-                  <optgroup key={deptId} label={`── ${dept.name} (Manual Override) ──`}>
-                    {deptMembers.map((emp) => {
-                      const name =
-                        emp.fullName ||
-                        `${emp.firstName || emp.first_name || ''} ${emp.lastName || emp.last_name || ''}`.trim() ||
-                        emp.name ||
-                        'Employee';
-                      const desig =
-                        emp.desig_title ||
-                        emp.designationTitle ||
-                        emp.designation?.title ||
-                        'Specialist';
-                      return (
-                        <option key={emp.id} value={emp.id}>
-                          {name} — {desig}
-                        </option>
-                      );
-                    })}
-                  </optgroup>
-                );
-              })}
+                  return (
+                    <optgroup key={deptId} label={`── ${dept.name} Specialists (Select 1) ──`}>
+                      {deptMembers.map((emp) => {
+                        const name =
+                          emp.fullName ||
+                          `${emp.firstName || emp.first_name || ''} ${emp.lastName || emp.last_name || ''}`.trim() ||
+                          emp.name ||
+                          'Employee';
+                        const desig =
+                          emp.desig_title ||
+                          emp.designationTitle ||
+                          emp.designation?.title ||
+                          'Specialist';
+                        return (
+                          <option key={emp.id} value={emp.id}>
+                            {name} — {desig}
+                          </option>
+                        );
+                      })}
+                    </optgroup>
+                  );
+                })}
             </select>
           </div>
         </div>

@@ -281,27 +281,44 @@ export const ceoTaskService = {
 
       const textToAnalyze = `${title} ${description || ''}`.toLowerCase();
 
-      let bestCandidate = null;
-      let highestScore = -Infinity;
+      // Step A: Determine the exact single target department
+      let targetDeptId = finalDeptId;
+      if (!targetDeptId) {
+        let bestDeptCode = null;
+        let highestDeptMatches = -1;
 
-      for (const emp of candidates) {
-        let score = 0;
-
-        // If user already specified a department, heavily prefer employees in that department
-        if (finalDeptId && emp.dept_id === finalDeptId) {
-          score += 150;
-        }
-
-        // Domain / Department keyword match
-        const deptCode = (emp.dept_code || '').toUpperCase();
-        const kwList = DEPT_KEYWORDS[deptCode] || [];
-        for (const kw of kwList) {
-          if (textToAnalyze.includes(kw)) {
-            score += 30;
+        for (const [code, kwList] of Object.entries(DEPT_KEYWORDS)) {
+          let matches = 0;
+          for (const kw of kwList) {
+            if (textToAnalyze.includes(kw)) matches++;
+          }
+          if (matches > highestDeptMatches) {
+            highestDeptMatches = matches;
+            bestDeptCode = code;
           }
         }
 
-        // Skill array matching
+        if (bestDeptCode) {
+          const matchEmp = candidates.find((c) => (c.dept_code || '').toUpperCase() === bestDeptCode);
+          if (matchEmp) targetDeptId = matchEmp.dept_id;
+        }
+        targetDeptId = targetDeptId || candidates[0].dept_id;
+      }
+
+      // Step B: Strictly isolate candidates to ONLY that specific department
+      let deptCandidates = candidates.filter((emp) => emp.dept_id === targetDeptId);
+      if (deptCandidates.length === 0) {
+        deptCandidates = candidates; // fallback if target department has no active personnel
+      }
+
+      // Step C: Evaluate and choose EXACTLY ONE person from that department
+      let bestCandidate = null;
+      let highestScore = -Infinity;
+
+      for (const emp of deptCandidates) {
+        let score = 0;
+
+        // Skill array matching within department
         const skills = Array.isArray(emp.skills) ? emp.skills : [];
         for (const skill of skills) {
           const sLower = String(skill).toLowerCase();
@@ -333,20 +350,25 @@ export const ceoTaskService = {
         }
       }
 
-      // Fallback to least loaded candidate if scoring was flat
       if (!bestCandidate) {
-        bestCandidate = candidates.sort((a, b) => (a.current_workload || 0) - (b.current_workload || 0))[0];
+        bestCandidate = deptCandidates.sort((a, b) => (a.current_workload || 0) - (b.current_workload || 0))[0];
       }
 
       finalAssigneeId = bestCandidate.id;
-      finalDeptId = finalDeptId || bestCandidate.dept_id;
+      finalDeptId = bestCandidate.dept_id;
       assignmentSource = 'AI';
-      aiReasoning = `AI observed directive specifications ('${title.trim()}') and matched with ${bestCandidate.dept_name || 'Operational Team'}. Auto-assigned to ${bestCandidate.first_name} ${bestCandidate.last_name} (${bestCandidate.desig_title || 'Specialist'}) with current capacity ${100 - (bestCandidate.current_workload || 0)}% and ${bestCandidate.active_tasks} active task(s).`;
+      aiReasoning = `Single Department Assignment: Directive assigned to 1 individual specialist in ${bestCandidate.dept_name}: ${bestCandidate.first_name} ${bestCandidate.last_name} (${bestCandidate.desig_title}). Current capacity: ${100 - (bestCandidate.current_workload || 0)}% available (${bestCandidate.active_tasks} active tasks).`;
     } else {
       // Manual selection validation
       const isAssigneeCeo = await checkIsEmployeeCeoOrAdmin(finalAssigneeId, orgId);
       if (isAssigneeCeo) {
         throw new Error('Executive Policy Violation: The CEO cannot be assigned organizational tasks.');
+      }
+
+      // Ensure the task's dept_id matches the single assignee's actual department
+      const empRes = await query(`SELECT dept_id FROM employees WHERE id = $1 AND org_id = $2`, [finalAssigneeId, orgId]);
+      if (empRes.rows.length > 0 && empRes.rows[0].dept_id) {
+        finalDeptId = empRes.rows[0].dept_id;
       }
     }
 
