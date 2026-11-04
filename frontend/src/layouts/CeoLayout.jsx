@@ -7,15 +7,12 @@ import {
   Clock,
   ShieldCheck,
   Users,
-  History,
   LogOut,
   Menu,
   X,
-  ChevronRight,
   User,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
-import { TaskNeraLogo } from '../components/common/TaskNeraLogo.jsx';
 
 export const CeoLayout = () => {
   const { user, isCeo, logout } = useAuth();
@@ -30,46 +27,44 @@ export const CeoLayout = () => {
 
   const navItems = [
     {
-      name: 'Executive Overview',
+      name: 'Overview',
       path: '/dashboard',
       icon: LayoutDashboard,
       ceoOnly: false,
     },
     {
-      name: 'Task Directives',
+      name: 'Tasks',
       path: '/tasks',
       icon: CheckSquare,
       ceoOnly: true,
-      badge: 'Core',
     },
     {
-      name: 'AI Allocation Engine',
+      name: 'Suggested Allocations',
       path: '/ai-allocation',
       icon: Sparkles,
       ceoOnly: true,
       badge: 'AI',
     },
     {
-      name: 'Pending Tasks & Reports',
+      name: 'Pending Tasks',
       path: '/pending-tasks',
       icon: Clock,
       ceoOnly: true,
     },
     {
-      name: 'Approval Centre',
+      name: 'Approvals',
       path: '/approvals',
       icon: ShieldCheck,
       ceoOnly: true,
-      badge: 'Executive',
     },
     {
-      name: 'Employee Directory',
+      name: 'Team Directory',
       path: '/employees',
       icon: Users,
       ceoOnly: false,
     },
     {
-      name: 'My Workspace & Tasks',
+      name: 'My Tasks',
       path: '/my-tasks',
       icon: CheckSquare,
       ceoOnly: false,
@@ -79,50 +74,46 @@ export const CeoLayout = () => {
   const visibleItems = navItems.filter((item) => !item.ceoOnly || isCeo);
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col antialiased text-slate-800">
-      {/* Top Global Executive Bar */}
-      <header className="h-16 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-4 sm:px-6 sticky top-0 z-40 shadow-md">
+    <div className="min-h-screen bg-slate-50 flex flex-col font-sans text-slate-800 antialiased">
+      {/* Top Header */}
+      <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 sm:px-6 sticky top-0 z-40">
         <div className="flex items-center gap-3">
           <button
             type="button"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 lg:hidden"
+            className="p-1.5 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 lg:hidden"
             aria-label="Toggle Navigation"
           >
             {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
 
-          <NavLink to="/dashboard" className="flex items-center gap-3 group">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-brand-600 to-indigo-500 flex items-center justify-center text-white font-black shadow-md border border-brand-400/30">
-              <ShieldCheck className="w-5 h-5" />
+          <NavLink to="/dashboard" className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-slate-900 text-white flex items-center justify-center font-bold text-sm shadow-xs">
+              TN
             </div>
             <div className="flex flex-col">
-              <div className="flex items-center gap-1.5 leading-none">
-                <span className="text-white font-black tracking-tight text-base">Task</span>
-                <span className="text-cyan-400 font-black tracking-tight text-base">Nera</span>
-                <span className="text-[10px] font-black uppercase tracking-wider bg-brand-500/20 text-brand-300 px-1.5 py-0.5 rounded border border-brand-500/30 ml-1">
-                  Command Centre
-                </span>
-              </div>
-              <span className="text-[10px] text-slate-400 font-medium tracking-wide mt-0.5">
-                Executive & AI Task Management Portal
+              <span className="text-sm font-bold text-slate-900 tracking-tight">
+                TaskNera
+              </span>
+              <span className="text-[11px] text-slate-500">
+                {isCeo ? 'Executive Workspace' : 'Team Workspace'}
               </span>
             </div>
           </NavLink>
         </div>
 
         {/* User Account & Actions */}
-        <div className="flex items-center gap-3 sm:gap-4">
-          <div className="flex items-center gap-2.5 bg-slate-800/80 border border-slate-700/80 px-3 py-1.5 rounded-xl">
-            <div className="w-7 h-7 rounded-lg bg-brand-500/20 text-brand-300 flex items-center justify-center font-bold text-xs uppercase border border-brand-400/30">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5 pl-3 border-l border-slate-200">
+            <div className="w-8 h-8 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center font-semibold text-xs border border-slate-200">
               {user?.firstName?.[0] || 'U'}
             </div>
             <div className="hidden sm:flex flex-col text-left">
-              <span className="text-xs font-bold text-white leading-tight">
+              <span className="text-xs font-semibold text-slate-900 leading-tight">
                 {user?.firstName} {user?.lastName}
               </span>
-              <span className="text-[10px] text-cyan-300 font-semibold tracking-wide">
-                {isCeo ? 'Chief Executive Officer' : user?.desigTitle || user?.role}
+              <span className="text-[11px] text-slate-500">
+                {isCeo ? 'CEO' : user?.desigTitle || user?.role}
               </span>
             </div>
           </div>
@@ -130,10 +121,11 @@ export const CeoLayout = () => {
           <button
             type="button"
             onClick={handleLogout}
-            className="p-2 text-slate-400 hover:text-rose-400 hover:bg-slate-800 rounded-xl transition-colors title='Sign Out'"
+            className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors ml-1 cursor-pointer"
+            title="Sign out"
             aria-label="Logout"
           >
-            <LogOut className="w-4.5 h-4.5" />
+            <LogOut className="w-4 h-4" />
           </button>
         </div>
       </header>
@@ -142,20 +134,11 @@ export const CeoLayout = () => {
       <div className="flex-1 flex overflow-hidden">
         {/* Desktop Sidebar Navigation */}
         <aside
-          className={`fixed inset-y-16 left-0 z-30 w-64 bg-white border-r border-slate-200 transform transition-transform duration-200 ease-in-out lg:translate-x-0 lg:static flex flex-col ${
+          className={`fixed inset-y-16 left-0 z-30 w-60 bg-white border-r border-slate-200 transform transition-transform duration-200 ease-in-out lg:translate-x-0 lg:static flex flex-col ${
             mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
           }`}
         >
-          <div className="p-4 border-b border-slate-100 flex items-center justify-between">
-            <span className="text-[11px] font-black uppercase tracking-wider text-slate-400">
-              Command Modules
-            </span>
-            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
-              v2.0
-            </span>
-          </div>
-
-          <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
+          <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
             {visibleItems.map((item) => {
               const Icon = item.icon;
               return (
@@ -164,23 +147,23 @@ export const CeoLayout = () => {
                   to={item.path}
                   onClick={() => setMobileMenuOpen(false)}
                   className={({ isActive }) =>
-                    `flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all duration-150 ${
+                    `flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
                       isActive
-                        ? 'bg-gradient-to-r from-brand-600 to-indigo-600 text-white shadow-sm shadow-brand-500/20 translate-x-0.5'
+                        ? 'bg-slate-900 text-white font-semibold shadow-xs'
                         : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
                     }`
                   }
                 >
-                  <div className="flex items-center gap-3 min-w-0">
+                  <div className="flex items-center gap-2.5 min-w-0">
                     <Icon className="w-4 h-4 shrink-0" />
                     <span className="truncate">{item.name}</span>
                   </div>
                   {item.badge && (
                     <span
-                      className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded ${
+                      className={`text-[10px] font-semibold px-1.5 py-0.2 rounded ${
                         location.pathname === item.path
                           ? 'bg-white/20 text-white'
-                          : 'bg-brand-50 text-brand-700 border border-brand-200'
+                          : 'bg-slate-100 text-slate-600'
                       }`}
                     >
                       {item.badge}
@@ -191,21 +174,15 @@ export const CeoLayout = () => {
             })}
           </nav>
 
-          {/* Sidebar Footer info */}
-          <div className="p-4 border-t border-slate-100 bg-slate-50/60 text-center">
-            <p className="text-[11px] font-medium text-slate-500">
-              TaskNera CEO Command Centre
-            </p>
-            <p className="text-[10px] text-slate-400 mt-0.5">
-              Independent Executive System
-            </p>
+          <div className="p-3 border-t border-slate-100 text-slate-400 text-[11px] text-center">
+            TaskNera Workspace
           </div>
         </aside>
 
         {/* Backdrop for mobile */}
         {mobileMenuOpen && (
           <div
-            className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-20 lg:hidden"
+            className="fixed inset-0 bg-slate-900/20 backdrop-blur-xs z-20 lg:hidden"
             onClick={() => setMobileMenuOpen(false)}
           />
         )}
@@ -218,4 +195,3 @@ export const CeoLayout = () => {
     </div>
   );
 };
-

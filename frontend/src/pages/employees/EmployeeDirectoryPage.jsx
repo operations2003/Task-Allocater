@@ -1,12 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Search, Filter, Briefcase, Mail, Phone, CheckCircle, AlertTriangle, ShieldCheck, Plus } from 'lucide-react';
+import { Search, Briefcase, Mail } from 'lucide-react';
 import { employeeService } from '../../services/employeeService.js';
-import { useAuth } from '../../context/AuthContext.jsx';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner.jsx';
 import { Badge } from '../../components/common/Badge.jsx';
 
 export const EmployeeDirectoryPage = () => {
-  const { isCeo } = useAuth();
   const [employees, setEmployees] = useState([]);
   const [departments, setDepartments] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -44,13 +42,13 @@ export const EmployeeDirectoryPage = () => {
       case 'AVAILABLE':
         return <Badge variant="success">Available</Badge>;
       case 'MODERATE':
-        return <Badge variant="info">Moderate Workload</Badge>;
+        return <Badge variant="neutral">Moderate</Badge>;
       case 'OVERLOADED':
         return <Badge variant="danger">Overloaded</Badge>;
       case 'ON_LEAVE':
         return <Badge variant="neutral">On Leave</Badge>;
       default:
-        return <Badge variant="neutral">{status}</Badge>;
+        return <Badge variant="neutral">{status || 'Available'}</Badge>;
     }
   };
 
@@ -60,29 +58,29 @@ export const EmployeeDirectoryPage = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-              Employee Directory & Capacity
+            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
+              Team Directory
             </h1>
-            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-brand-50 text-brand-700 border border-brand-200 uppercase tracking-wide">
-              {employees.length} Members
+            <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+              {employees.length} members
             </span>
           </div>
           <p className="text-xs sm:text-sm text-slate-500 mt-1">
-            Organizational source of truth for task assignment, skills matrix, and workload capacity.
+            View team members, departments, and workload.
           </p>
         </div>
       </div>
 
       {/* Filter and Search Bar */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-xs flex flex-col md:flex-row items-center gap-3">
+      <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs flex flex-col md:flex-row items-center gap-3">
         <div className="relative flex-1 w-full">
           <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search employees by name, role, skills, or email..."
-            className="w-full pl-9 pr-4 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all"
+            placeholder="Search by name, role, skills, or email..."
+            className="w-full pl-9 pr-4 py-2 rounded-lg bg-slate-50 border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 transition-colors"
           />
         </div>
 
@@ -90,7 +88,7 @@ export const EmployeeDirectoryPage = () => {
           <select
             value={selectedDept}
             onChange={(e) => setSelectedDept(e.target.value)}
-            className="px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+            className="px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-slate-900/10"
           >
             <option value="">All Departments</option>
             {departments.map((d) => (
@@ -103,7 +101,7 @@ export const EmployeeDirectoryPage = () => {
           <select
             value={selectedAvailability}
             onChange={(e) => setSelectedAvailability(e.target.value)}
-            className="px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+            className="px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-slate-900/10"
           >
             <option value="">All Availability</option>
             <option value="AVAILABLE">Available</option>
@@ -120,9 +118,8 @@ export const EmployeeDirectoryPage = () => {
           <LoadingSpinner />
         </div>
       ) : employees.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center">
-          <Users className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-          <h3 className="text-sm font-bold text-slate-800">No employees found</h3>
+        <div className="bg-white rounded-xl border border-slate-200 p-12 text-center">
+          <h3 className="text-sm font-semibold text-slate-800">No members found</h3>
           <p className="text-xs text-slate-500 mt-1">Try adjusting your search criteria or filters.</p>
         </div>
       ) : (
@@ -135,20 +132,20 @@ export const EmployeeDirectoryPage = () => {
             return (
               <div
                 key={emp.id}
-                className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs hover:shadow-md transition-all flex flex-col justify-between"
+                className="bg-white rounded-xl border border-slate-200 p-5 shadow-xs hover:border-slate-300 transition-colors flex flex-col justify-between"
               >
                 <div>
                   <div className="flex items-start justify-between gap-3 mb-3">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-brand-50 border border-brand-100 flex items-center justify-center font-bold text-brand-700 text-sm">
+                      <div className="w-9 h-9 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center font-semibold text-slate-700 text-xs">
                         {emp.first_name?.[0]}
                         {emp.last_name?.[0]}
                       </div>
                       <div>
-                        <h3 className="text-sm font-bold text-slate-900 leading-tight">
+                        <h3 className="text-sm font-semibold text-slate-900 leading-tight">
                           {emp.first_name} {emp.last_name}
                         </h3>
-                        <span className="text-[11px] font-medium text-slate-500 block">
+                        <span className="text-[11px] text-slate-500 block">
                           {emp.desig_title || emp.designation_title || 'Specialist'}
                         </span>
                       </div>
@@ -159,29 +156,29 @@ export const EmployeeDirectoryPage = () => {
                   <div className="space-y-1.5 text-xs text-slate-600 mb-4">
                     <div className="flex items-center gap-2">
                       <Briefcase className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                      <span className="font-medium text-slate-700 truncate">
+                      <span className="text-slate-700 truncate">
                         {emp.dept_name || emp.department_name || 'General'}
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
                       <Mail className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                      <span className="truncate text-slate-600">{emp.email}</span>
+                      <span className="truncate text-slate-500">{emp.email}</span>
                     </div>
                   </div>
 
-                  {/* Skills tags */}
+                  {/* Skills */}
                   {Array.isArray(emp.skills) && emp.skills.length > 0 && (
                     <div className="flex flex-wrap gap-1 mb-4">
                       {emp.skills.slice(0, 3).map((skill, idx) => (
                         <span
                           key={idx}
-                          className="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-600 border border-slate-200"
+                          className="px-2 py-0.5 rounded text-[10px] font-medium bg-slate-50 text-slate-600 border border-slate-200"
                         >
                           {skill}
                         </span>
                       ))}
                       {emp.skills.length > 3 && (
-                        <span className="text-[10px] text-slate-400 font-semibold px-1">
+                        <span className="text-[10px] text-slate-400 font-medium px-1">
                           +{emp.skills.length - 3}
                         </span>
                       )}
@@ -189,30 +186,30 @@ export const EmployeeDirectoryPage = () => {
                   )}
                 </div>
 
-                {/* Workload Meter */}
+                {/* Workload */}
                 <div className="pt-3 border-t border-slate-100">
                   <div className="flex items-center justify-between text-xs mb-1">
-                    <span className="font-semibold text-slate-600">Workload Capacity</span>
+                    <span className="text-slate-500">Workload</span>
                     <span
-                      className={`font-black ${
+                      className={`font-semibold ${
                         isOverloaded
                           ? 'text-rose-600'
                           : isModerate
                           ? 'text-amber-600'
-                          : 'text-emerald-600'
+                          : 'text-slate-800'
                       }`}
                     >
                       {workload}%
                     </span>
                   </div>
-                  <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                  <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
                     <div
                       className={`h-full rounded-full transition-all duration-300 ${
                         isOverloaded
                           ? 'bg-rose-500'
                           : isModerate
                           ? 'bg-amber-500'
-                          : 'bg-emerald-500'
+                          : 'bg-slate-800'
                       }`}
                       style={{ width: `${Math.min(100, workload)}%` }}
                     />
@@ -226,4 +223,3 @@ export const EmployeeDirectoryPage = () => {
     </div>
   );
 };
-

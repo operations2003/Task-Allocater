@@ -1,10 +1,7 @@
 import React, { useState } from 'react';
 import {
-  ShieldAlert,
   CheckCircle2,
-  XCircle,
   Clock,
-  User,
   DollarSign,
   AlertTriangle,
   UserMinus,
@@ -12,8 +9,6 @@ import {
   FileText,
   ThumbsUp,
   ThumbsDown,
-  Layers,
-  Sparkles,
 } from 'lucide-react';
 import { Badge } from '../common/Badge.jsx';
 import { Button } from '../common/Button.jsx';
@@ -29,11 +24,11 @@ export const CeoApprovalCentre = ({ approvals = [], onDecision }) => {
   });
 
   const categories = [
-    { id: 'ALL', label: 'All Executive Approvals' },
-    { id: 'SALARY_CHANGE', label: 'Salary & Compensation' },
-    { id: 'DISCIPLINARY', label: 'Disciplinary Inquiries' },
-    { id: 'TERMINATION', label: 'Terminations & Exits' },
-    { id: 'POLICY_CHANGE', label: 'Company Policy Changes' },
+    { id: 'ALL', label: 'All Requests' },
+    { id: 'SALARY_CHANGE', label: 'Compensation' },
+    { id: 'DISCIPLINARY', label: 'Disciplinary' },
+    { id: 'TERMINATION', label: 'Departures' },
+    { id: 'POLICY_CHANGE', label: 'Policy Updates' },
   ];
 
   const filteredApprovals = approvals.filter((a) => {
@@ -51,49 +46,45 @@ export const CeoApprovalCentre = ({ approvals = [], onDecision }) => {
   const getCategoryIcon = (category) => {
     switch (category) {
       case 'SALARY_CHANGE':
-        return <DollarSign className="w-4 h-4 text-emerald-500" />;
+        return <DollarSign className="w-3.5 h-3.5 text-slate-600" />;
       case 'DISCIPLINARY':
-        return <AlertTriangle className="w-4 h-4 text-rose-500" />;
+        return <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />;
       case 'TERMINATION':
-        return <UserMinus className="w-4 h-4 text-amber-500" />;
+        return <UserMinus className="w-3.5 h-3.5 text-rose-500" />;
       case 'POLICY_CHANGE':
-        return <BookOpen className="w-4 h-4 text-brand-500" />;
+        return <BookOpen className="w-3.5 h-3.5 text-slate-600" />;
       default:
-        return <FileText className="w-4 h-4 text-slate-500" />;
+        return <FileText className="w-3.5 h-3.5 text-slate-500" />;
     }
   };
 
   return (
     <div className="space-y-6">
-      {/* Header Banner */}
-      <div className="bg-slate-900 rounded-2xl p-6 text-white border border-slate-800 shadow-brand flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div className="space-y-1">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-white/10 text-brand-300">
-            <ShieldAlert className="w-3.5 h-3.5 text-brand-400" />
-            Executive Governance & Authority
-          </div>
-          <h2 className="text-xl font-extrabold tracking-tight">CEO Approval Centre</h2>
-          <p className="text-xs text-slate-300 leading-relaxed max-w-xl">
-            Authorize or reject high-impact operational decisions: Disciplinary actions, compensation modifications, employee offboarding, and governance policy changes.
+      {/* Top Header */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
+        <div>
+          <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
+            <span>Approvals</span>
+            <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+              {approvals.length} pending
+            </span>
+          </h2>
+          <p className="text-xs text-slate-500 mt-0.5">
+            Review and decide on compensation, team departures, and policy updates.
           </p>
-        </div>
-
-        <div className="bg-white/10 backdrop-blur-md rounded-xl p-3 border border-white/10 text-center shrink-0 w-36">
-          <span className="block text-2xl font-black text-white">{approvals.length}</span>
-          <span className="text-[10px] uppercase font-bold text-slate-300 tracking-wider">Awaiting Decision</span>
         </div>
       </div>
 
-      {/* Categories Filter Tabs */}
-      <div className="flex items-center gap-2 overflow-x-auto text-xs pb-1">
+      {/* Category Tabs */}
+      <div className="flex items-center gap-1.5 overflow-x-auto text-xs pb-1">
         {categories.map((c) => (
           <button
             key={c.id}
             onClick={() => setActiveCategory(c.id)}
-            className={`px-3 py-2 rounded-xl font-bold transition-all cursor-pointer shrink-0 ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer shrink-0 ${
               activeCategory === c.id
-                ? 'bg-brand-600 text-white shadow-brand'
-                : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-800 hover:bg-slate-50'
+                ? 'bg-slate-900 text-white font-semibold'
+                : 'text-slate-600 hover:bg-slate-100'
             }`}
           >
             {c.label}
@@ -101,82 +92,76 @@ export const CeoApprovalCentre = ({ approvals = [], onDecision }) => {
         ))}
       </div>
 
-      {/* Approvals Cards List */}
+      {/* Approvals Cards */}
       <div className="space-y-4">
         {filteredApprovals.length === 0 ? (
-          <div className="bg-white dark:bg-slate-900 rounded-2xl p-12 text-center border border-slate-200 dark:border-slate-800">
-            <CheckCircle2 className="w-10 h-10 text-emerald-500 mx-auto mb-3" />
-            <h4 className="text-base font-bold text-slate-800 dark:text-slate-100">Executive Queue Clear</h4>
-            <p className="text-xs text-slate-500 mt-1">
-              There are no pending approvals requiring CEO intervention in this category.
+          <div className="bg-white rounded-xl p-12 text-center border border-slate-200">
+            <CheckCircle2 className="w-8 h-8 text-emerald-500 mx-auto mb-2" />
+            <h3 className="text-sm font-semibold text-slate-800">No Pending Approvals</h3>
+            <p className="text-xs text-slate-400 mt-1">
+              All requests in this category have been processed.
             </p>
           </div>
         ) : (
           filteredApprovals.map((appr) => (
             <div
               key={appr.id}
-              className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 shadow-sm space-y-4 hover:border-brand-300 dark:hover:border-brand-800 transition-all"
+              className="bg-white rounded-xl border border-slate-200 p-5 shadow-xs space-y-4 hover:border-slate-300 transition-colors"
             >
               {/* Header */}
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <div className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800">
+                  <div className="p-1 rounded bg-slate-100">
                     {getCategoryIcon(appr.category)}
                   </div>
-                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                    {appr.category.replace(/_/g, ' ')}
+                  <span className="text-xs font-semibold text-slate-700">
+                    {appr.category ? appr.category.replace(/_/g, ' ') : 'General'}
                   </span>
-                  <Badge variant={appr.priority === 'URGENT' ? 'danger' : 'warning'}>
-                    {appr.priority || 'HIGH'}
+                  <Badge variant={appr.priority === 'URGENT' ? 'danger' : 'neutral'}>
+                    {appr.priority || 'NORMAL'}
                   </Badge>
                 </div>
 
-                <div className="text-xs text-slate-500 flex items-center gap-1 font-mono">
+                <div className="text-xs text-slate-400 flex items-center gap-1">
                   <Clock className="w-3.5 h-3.5" />
-                  <span>Submitted: {appr.date}</span>
+                  <span>Submitted {appr.date || 'recently'}</span>
                 </div>
               </div>
 
               {/* Title & Subject */}
               <div>
-                <h3 className="text-base font-bold text-slate-900 dark:text-white">{appr.title}</h3>
-                <div className="flex items-center gap-3 text-xs text-slate-500 mt-1 flex-wrap">
-                  <span>
-                    Subject: <strong>{appr.subjectEmployee}</strong>
-                  </span>
-                  <span>•</span>
-                  <span>
-                    Dept: <strong>{appr.department}</strong>
-                  </span>
-                  <span>•</span>
-                  <span>
-                    Submitted By: <strong>{appr.submittedBy}</strong>
-                  </span>
+                <h3 className="text-sm font-bold text-slate-900">{appr.title}</h3>
+                <div className="flex items-center gap-2 text-xs text-slate-500 mt-1 flex-wrap">
+                  {appr.subjectEmployee && <span>Subject: <strong className="text-slate-700">{appr.subjectEmployee}</strong></span>}
+                  {appr.department && <span>• {appr.department}</span>}
+                  {appr.submittedBy && <span>• Submitted by {appr.submittedBy}</span>}
                 </div>
               </div>
 
               {/* Justification Box */}
-              <div className="bg-slate-50 dark:bg-slate-800/60 rounded-xl p-3.5 border border-slate-200/80 dark:border-slate-700/80 text-xs text-slate-700 dark:text-slate-300">
-                <span className="font-bold text-slate-900 dark:text-white block mb-0.5">Formal Rationale & Findings:</span>
-                <p className="leading-relaxed">{appr.reason}</p>
-              </div>
+              {appr.reason && (
+                <div className="bg-slate-50 rounded-lg p-3 border border-slate-200 text-xs text-slate-700">
+                  <span className="font-semibold text-slate-900 block mb-0.5">Notes:</span>
+                  <p className="leading-relaxed">{appr.reason}</p>
+                </div>
+              )}
 
-              {/* Supporting Details & Metadata */}
+              {/* Supporting Details */}
               {appr.details && Object.keys(appr.details).length > 0 && (
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-3 rounded-xl bg-slate-100/60 dark:bg-slate-800/40 text-xs">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 p-3 rounded-lg bg-slate-50 text-xs border border-slate-100">
                   {Object.entries(appr.details).map(([k, v]) => (
                     <div key={k}>
-                      <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">
+                      <span className="text-[10px] uppercase font-semibold text-slate-400 block">
                         {k.replace(/([A-Z])/g, ' $1')}
                       </span>
-                      <span className="font-semibold text-slate-800 dark:text-slate-200">{String(v)}</span>
+                      <span className="font-medium text-slate-800">{String(v)}</span>
                     </div>
                   ))}
                 </div>
               )}
 
-              {/* Decision Action Buttons */}
-              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+              {/* Action Buttons */}
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
                 <Button
                   variant="ghost"
                   onClick={() =>
@@ -187,13 +172,13 @@ export const CeoApprovalCentre = ({ approvals = [], onDecision }) => {
                       comment: '',
                     })
                   }
-                  className="text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/50 inline-flex items-center gap-1.5"
+                  className="text-xs text-slate-600 hover:text-rose-600"
                 >
-                  <ThumbsDown className="w-3.5 h-3.5" /> Reject Request
+                  <ThumbsDown className="w-3.5 h-3.5 mr-1" /> Reject
                 </Button>
 
-                <Button
-                  variant="primary"
+                <button
+                  type="button"
                   onClick={() =>
                     setDecisionModal({
                       isOpen: true,
@@ -202,10 +187,10 @@ export const CeoApprovalCentre = ({ approvals = [], onDecision }) => {
                       comment: '',
                     })
                   }
-                  className="text-xs bg-emerald-600 hover:bg-emerald-700 inline-flex items-center gap-1.5"
+                  className="px-3.5 py-1.5 rounded-lg bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800 transition-colors inline-flex items-center gap-1.5 shadow-xs cursor-pointer"
                 >
-                  <ThumbsUp className="w-3.5 h-3.5" /> Authorize & Approve Decision
-                </Button>
+                  <ThumbsUp className="w-3.5 h-3.5" /> Approve
+                </button>
               </div>
             </div>
           ))
@@ -216,14 +201,14 @@ export const CeoApprovalCentre = ({ approvals = [], onDecision }) => {
       <Modal
         isOpen={decisionModal.isOpen}
         onClose={() => setDecisionModal({ isOpen: false, item: null, action: 'APPROVE', comment: '' })}
-        title={decisionModal.action === 'APPROVE' ? 'Executive Approval Confirmation' : 'Executive Rejection'}
-        subtitle={`Action for: ${decisionModal.item?.title || ''}`}
+        title={decisionModal.action === 'APPROVE' ? 'Approve Request' : 'Reject Request'}
+        subtitle={`Request: ${decisionModal.item?.title || ''}`}
         maxWidth="max-w-md"
       >
-        <form onSubmit={handleConfirmDecision} className="p-6 space-y-4">
+        <form onSubmit={handleConfirmDecision} className="p-5 space-y-4">
           <div>
-            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1">
-              {decisionModal.action === 'APPROVE' ? 'Executive Approval Notes / Caveats' : 'Mandatory Rejection Feedback *'}
+            <label className="block text-xs font-semibold text-slate-700 mb-1">
+              {decisionModal.action === 'APPROVE' ? 'Notes (optional)' : 'Reason for rejection *'}
             </label>
             <textarea
               required={decisionModal.action === 'REJECT'}
@@ -232,31 +217,31 @@ export const CeoApprovalCentre = ({ approvals = [], onDecision }) => {
               onChange={(e) => setDecisionModal({ ...decisionModal, comment: e.target.value })}
               placeholder={
                 decisionModal.action === 'APPROVE'
-                  ? 'Add executive notes or implementation instructions...'
-                  : 'Specify why this sensitive decision is returned or denied...'
+                  ? 'Add any instructions or notes...'
+                  : 'Specify why this request cannot be approved...'
               }
-              className="w-full px-3 py-2 text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500"
+              className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900"
             />
           </div>
 
-          <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200 dark:border-slate-800">
+          <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
             <Button
               variant="ghost"
               onClick={() => setDecisionModal({ isOpen: false, item: null, action: 'APPROVE', comment: '' })}
             >
               Cancel
             </Button>
-            <Button
+            <button
               type="submit"
-              variant={decisionModal.action === 'APPROVE' ? 'primary' : 'danger'}
-              className={decisionModal.action === 'APPROVE' ? 'bg-emerald-600 hover:bg-emerald-700' : ''}
+              className={`px-4 py-2 rounded-lg text-xs font-semibold text-white cursor-pointer ${
+                decisionModal.action === 'APPROVE' ? 'bg-slate-900 hover:bg-slate-800' : 'bg-rose-600 hover:bg-rose-700'
+              }`}
             >
-              {decisionModal.action === 'APPROVE' ? 'Confirm Authorization' : 'Confirm Rejection'}
-            </Button>
+              {decisionModal.action === 'APPROVE' ? 'Confirm Approval' : 'Confirm Rejection'}
+            </button>
           </div>
         </form>
       </Modal>
     </div>
   );
 };
-

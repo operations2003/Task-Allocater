@@ -177,4 +177,3 @@ process.on('SIGTERM', async () => {
   await closePool();
   process.exit(0);
 });
-

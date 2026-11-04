@@ -1,19 +1,11 @@
 import React, { useState } from 'react';
 import {
   Sparkles,
-  ShieldCheck,
   CheckCircle2,
-  XCircle,
-  Clock,
-  ArrowRight,
-  User,
   Calendar,
-  AlertCircle,
   Sliders,
   CheckSquare,
-  Building2,
   Activity,
-  Layers,
   ThumbsUp,
   ThumbsDown,
 } from 'lucide-react';
@@ -61,181 +53,173 @@ export const AiTaskAllocationSection = ({
 
   return (
     <div className="space-y-6">
-      {/* Header Banner */}
-      <div className="bg-gradient-to-r from-purple-900 via-indigo-900 to-slate-900 rounded-2xl p-6 text-white shadow-brand-lg relative overflow-hidden">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div className="space-y-1.5 max-w-xl">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-white/10 text-purple-200 border border-white/10">
-              <Sparkles className="w-3.5 h-3.5 text-purple-300" />
-              Autonomous Workforce AI Engine
-            </div>
-            <h2 className="text-xl font-extrabold tracking-tight">AI Task Allocation & Capacity Balancing</h2>
-            <p className="text-xs text-purple-200/90 leading-relaxed">
-              Workload-optimized task allocation based on real-time employee availability, skills match, and active sprint load. High-impact organizational assignments require your executive approval prior to deployment.
-            </p>
-          </div>
-
-          <div className="bg-white/10 backdrop-blur-md rounded-xl p-3 border border-white/10 text-center shrink-0 w-36">
-            <span className="block text-2xl font-black text-white">{allocations.length}</span>
-            <span className="text-[10px] uppercase font-bold text-purple-200 tracking-wider">Awaiting Decision</span>
-          </div>
+      {/* Top Header */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
+        <div>
+          <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
+            <span>Suggested Allocations</span>
+            <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+              {allocations.length} pending review
+            </span>
+          </h2>
+          <p className="text-xs text-slate-500 mt-0.5">
+            Recommended assignments based on team member capacity, existing tasks, and skills.
+          </p>
         </div>
       </div>
 
-      {/* Allocations Cards Stream */}
+      {/* Allocations Cards */}
       <div className="space-y-4">
         {allocations.length === 0 ? (
-          <div className="bg-white dark:bg-slate-900 rounded-2xl p-12 text-center border border-slate-200 dark:border-slate-800">
-            <CheckCircle2 className="w-10 h-10 text-emerald-500 mx-auto mb-3" />
-            <h4 className="text-base font-bold text-slate-800 dark:text-slate-100">All AI Allocations Processed</h4>
-            <p className="text-xs text-slate-500 mt-1">There are no pending AI task recommendations requiring CEO intervention.</p>
+          <div className="bg-white rounded-xl p-12 text-center border border-slate-200">
+            <CheckCircle2 className="w-8 h-8 text-emerald-500 mx-auto mb-2" />
+            <h3 className="text-sm font-semibold text-slate-800">All Suggestions Reviewed</h3>
+            <p className="text-xs text-slate-400 mt-1">There are no pending recommendations at this time.</p>
           </div>
         ) : (
-          allocations.map((item) => (
-            <div
-              key={item.id}
-              className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm p-5 space-y-4 hover:border-brand-300 dark:hover:border-brand-800 transition-all"
-            >
-              {/* Card Top: Badges & Title */}
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
-                    <Sparkles className="w-3 h-3" /> AI Assigned
-                  </span>
-                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
-                    <Clock className="w-3 h-3" /> Awaiting CEO Approval
-                  </span>
-                  <Badge variant={item.priority === 'URGENT' ? 'danger' : 'warning'}>
-                    {item.priority || 'HIGH'}
-                  </Badge>
-                </div>
+          allocations.map((item) => {
+            const assignee = item.suggestedAssignee || item.suggestedEmployee || {};
+            const deadline = item.suggestedDeadline || item.dueDate || 'Flexible';
+            const reasoning = item.aiReasoning || item.reasoning || 'Matched based on relevant department and skills.';
+            const subtasks = item.aiSubtasks || item.subtasks || [];
 
-                <div className="text-xs text-slate-500 flex items-center gap-1">
-                  <Calendar className="w-3.5 h-3.5" />
-                  <span>Suggested Deadline: <strong>{item.suggestedDeadline}</strong></span>
-                </div>
-              </div>
-
-              {/* Task Title & Description */}
-              <div>
-                <h3 className="text-base font-bold text-slate-900 dark:text-white">{item.taskTitle}</h3>
-                {item.taskDescription && (
-                  <p className="text-xs text-slate-600 dark:text-slate-300 mt-1 leading-relaxed">
-                    {item.taskDescription}
-                  </p>
-                )}
-              </div>
-
-              {/* Suggested Employee Workload Profile */}
-              <div className="bg-slate-50 dark:bg-slate-800/60 rounded-xl p-4 border border-slate-200/80 dark:border-slate-700/80 grid grid-cols-1 sm:grid-cols-3 gap-4 items-center">
-                <div className="flex items-center gap-3">
-                  <Avatar name={item.suggestedAssignee.name} size="md" />
-                  <div>
-                    <span className="text-[10px] font-bold text-purple-600 dark:text-purple-400 uppercase tracking-wider block">
-                      Recommended Assignee
-                    </span>
-                    <span className="text-sm font-bold text-slate-900 dark:text-white">
-                      {item.suggestedAssignee.name}
-                    </span>
-                    <span className="text-[11px] text-slate-400 block">
-                      {item.suggestedAssignee.designation} ({item.suggestedAssignee.department})
-                    </span>
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                    Capacity & Workload
-                  </span>
+            return (
+              <div
+                key={item.id}
+                className="bg-white rounded-xl border border-slate-200 shadow-xs p-5 space-y-4 hover:border-slate-300 transition-colors"
+              >
+                {/* Header row */}
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
-                    <div className="flex-1 bg-slate-200 dark:bg-slate-700 h-2 rounded-full overflow-hidden">
-                      <div className="bg-brand-500 h-full rounded-full" style={{ width: '74%' }} />
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-700">
+                      <Sparkles className="w-2.5 h-2.5 text-slate-500" /> Suggested Task
+                    </span>
+                    <Badge variant={item.priority === 'URGENT' ? 'danger' : 'warning'}>
+                      {item.priority || 'HIGH'}
+                    </Badge>
+                  </div>
+
+                  <div className="text-xs text-slate-500 flex items-center gap-1.5">
+                    <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                    <span>Target Date: <strong>{deadline}</strong></span>
+                  </div>
+                </div>
+
+                {/* Title & Description */}
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">{item.taskTitle}</h3>
+                  {item.taskDescription && (
+                    <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                      {item.taskDescription}
+                    </p>
+                  )}
+                </div>
+
+                {/* Assignee Card */}
+                <div className="bg-slate-50 rounded-lg p-3.5 border border-slate-200 grid grid-cols-1 sm:grid-cols-3 gap-3 items-center">
+                  <div className="flex items-center gap-2.5">
+                    <Avatar name={assignee.name} size="sm" />
+                    <div>
+                      <span className="text-[10px] font-medium text-slate-400 uppercase tracking-wider block">
+                        Suggested For
+                      </span>
+                      <span className="text-xs font-semibold text-slate-900">
+                        {assignee.name}
+                      </span>
+                      <span className="text-[11px] text-slate-500 block">
+                        {assignee.designation || assignee.department || 'Specialist'}
+                      </span>
                     </div>
-                    <span className="text-xs font-bold text-slate-700 dark:text-slate-200">
-                      {item.suggestedAssignee.workload}
+                  </div>
+
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-medium text-slate-400 uppercase tracking-wider block">
+                      Workload
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 bg-slate-200 h-1.5 rounded-full overflow-hidden">
+                        <div className="bg-slate-800 h-full rounded-full" style={{ width: `${assignee.workload || 45}%` }} />
+                      </div>
+                      <span className="text-xs font-medium text-slate-700">
+                        {assignee.workload || 45}%
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-medium text-slate-400 uppercase tracking-wider block">
+                      Availability
+                    </span>
+                    <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700">
+                      <Activity className="w-3 h-3 text-emerald-500" />
+                      {assignee.availability || 'Available'}
                     </span>
                   </div>
-                  <span className="text-[10px] text-slate-400">
-                    {item.suggestedAssignee.existingAssignmentsCount} other active assignments
-                  </span>
                 </div>
 
-                <div className="space-y-1">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                    Real-time Availability
-                  </span>
-                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
-                    <Activity className="w-3 h-3" />
-                    {item.suggestedAssignee.availability}
-                  </span>
+                {/* Reason */}
+                <div className="p-3 rounded-lg bg-slate-50 text-xs text-slate-700 border border-slate-200">
+                  <span className="font-semibold text-slate-900">Why this match: </span>
+                  <span>{reasoning}</span>
                 </div>
-              </div>
 
-              {/* AI Allocation Reasoning Card */}
-              <div className="p-3.5 rounded-xl bg-purple-50/70 dark:bg-purple-950/30 border border-purple-200/80 dark:border-purple-900/60 text-xs text-purple-900 dark:text-purple-200 flex items-start gap-2.5">
-                <Sparkles className="w-4 h-4 text-purple-600 shrink-0 mt-0.5" />
-                <div>
-                  <span className="font-bold">AI Allocation Rationale: </span>
-                  <span>{item.aiReasoning}</span>
-                </div>
-              </div>
-
-              {/* AI-Generated Subtasks */}
-              {item.aiSubtasks && item.aiSubtasks.length > 0 && (
-                <div className="space-y-1.5 pt-1">
-                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                    AI-Synthesized Work Milestones:
-                  </span>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                    {item.aiSubtasks.map((st) => (
-                      <div
-                        key={st.id}
-                        className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-xs text-slate-700 dark:text-slate-300"
-                      >
-                        <CheckSquare className="w-3.5 h-3.5 text-slate-400" />
-                        <span className="truncate">{st.title}</span>
-                      </div>
-                    ))}
+                {/* Subtasks */}
+                {subtasks.length > 0 && (
+                  <div className="space-y-1.5 pt-1">
+                    <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                      Included Steps:
+                    </span>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {subtasks.map((st, idx) => (
+                        <div
+                          key={st.id || idx}
+                          className="flex items-center gap-2 p-2 rounded-md bg-white border border-slate-200 text-xs text-slate-700"
+                        >
+                          <CheckSquare className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          <span className="truncate">{st.title}</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
+                )}
+
+                {/* Action Buttons */}
+                <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                  <Button
+                    variant="outline"
+                    onClick={() =>
+                      setAdjustModal({
+                        isOpen: true,
+                        item,
+                        newAssigneeId: assignee.id,
+                        newDeadline: deadline,
+                        priority: item.priority || 'HIGH',
+                      })
+                    }
+                    className="text-xs inline-flex items-center gap-1.5"
+                  >
+                    <Sliders className="w-3.5 h-3.5" /> Edit Details
+                  </Button>
+
+                  <Button
+                    variant="ghost"
+                    onClick={() => setRejectModal({ isOpen: true, item, feedback: '' })}
+                    className="text-xs text-slate-600 hover:text-rose-600"
+                  >
+                    <ThumbsDown className="w-3.5 h-3.5 mr-1" /> Dismiss
+                  </Button>
+
+                  <button
+                    type="button"
+                    onClick={() => onApprove(item.id, item)}
+                    className="px-3.5 py-1.5 rounded-lg bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800 transition-colors inline-flex items-center gap-1.5 shadow-xs cursor-pointer"
+                  >
+                    <ThumbsUp className="w-3.5 h-3.5" /> Approve Task
+                  </button>
                 </div>
-              )}
-
-              {/* Action Buttons: 1-Click Approve, Reject, or Adjust */}
-              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
-                <Button
-                  variant="outline"
-                  onClick={() =>
-                    setAdjustModal({
-                      isOpen: true,
-                      item,
-                      newAssigneeId: item.suggestedAssignee.id,
-                      newDeadline: item.suggestedDeadline,
-                      priority: item.priority,
-                    })
-                  }
-                  className="text-xs inline-flex items-center gap-1.5"
-                >
-                  <Sliders className="w-3.5 h-3.5" /> Adjust & Override
-                </Button>
-
-                <Button
-                  variant="ghost"
-                  onClick={() => setRejectModal({ isOpen: true, item, feedback: '' })}
-                  className="text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/50 inline-flex items-center gap-1.5"
-                >
-                  <ThumbsDown className="w-3.5 h-3.5" /> Reject Allocation
-                </Button>
-
-                <Button
-                  variant="primary"
-                  onClick={() => onApprove(item.id, item)}
-                  className="text-xs bg-emerald-600 hover:bg-emerald-700 inline-flex items-center gap-1.5"
-                >
-                  <ThumbsUp className="w-3.5 h-3.5" /> Approve & Deploy Directive
-                </Button>
               </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
 
@@ -243,35 +227,37 @@ export const AiTaskAllocationSection = ({
       <Modal
         isOpen={rejectModal.isOpen}
         onClose={() => setRejectModal({ isOpen: false, item: null, feedback: '' })}
-        title="Reject AI Task Recommendation"
-        subtitle="Provide guidance to refine future AI allocations"
+        title="Dismiss Recommendation"
+        subtitle="Optional reason for feedback"
         maxWidth="max-w-md"
       >
-        <form onSubmit={handleConfirmReject} className="p-6 space-y-4">
+        <form onSubmit={handleConfirmReject} className="p-5 space-y-4">
           <div>
-            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1">
-              Rejection Rationale <span className="text-rose-500">*</span>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">
+              Feedback
             </label>
             <textarea
-              required
               rows="3"
               value={rejectModal.feedback}
               onChange={(e) => setRejectModal({ ...rejectModal, feedback: e.target.value })}
-              placeholder="e.g. Employee already leading confidential client bid; re-assign to another squad..."
-              className="w-full px-3 py-2 text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500"
+              placeholder="e.g. Needs to be assigned to someone else..."
+              className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900"
             />
           </div>
 
-          <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200 dark:border-slate-800">
+          <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
             <Button
               variant="ghost"
               onClick={() => setRejectModal({ isOpen: false, item: null, feedback: '' })}
             >
               Cancel
             </Button>
-            <Button type="submit" variant="danger">
-              Confirm Rejection
-            </Button>
+            <button
+              type="submit"
+              className="px-4 py-2 rounded-lg bg-rose-600 text-white text-xs font-semibold hover:bg-rose-700 cursor-pointer"
+            >
+              Confirm Dismissal
+            </button>
           </div>
         </form>
       </Modal>
@@ -288,20 +274,20 @@ export const AiTaskAllocationSection = ({
             priority: 'HIGH',
           })
         }
-        title="Adjust & Override AI Allocation"
-        subtitle={`Modifying recommendation for: ${adjustModal.item?.taskTitle || ''}`}
+        title="Edit Task Details"
+        subtitle={`Task: ${adjustModal.item?.taskTitle || ''}`}
         maxWidth="max-w-md"
       >
-        <form onSubmit={handleConfirmAdjust} className="p-6 space-y-4">
+        <form onSubmit={handleConfirmAdjust} className="p-5 space-y-4">
           <div>
-            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1">
-              Assignee (No CEO) <span className="text-rose-500">*</span>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">
+              Assignee <span className="text-rose-500">*</span>
             </label>
             <select
               required
               value={adjustModal.newAssigneeId}
               onChange={(e) => setAdjustModal({ ...adjustModal, newAssigneeId: e.target.value })}
-              className="w-full px-3 py-2 text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500"
+              className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900"
             >
               {assignableEmployees.map((emp) => (
                 <option key={emp.id} value={emp.id}>
@@ -312,35 +298,35 @@ export const AiTaskAllocationSection = ({
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1">
-              Revised Deadline
+            <label className="block text-xs font-semibold text-slate-700 mb-1">
+              Due Date
             </label>
             <input
               type="date"
               required
               value={adjustModal.newDeadline}
               onChange={(e) => setAdjustModal({ ...adjustModal, newDeadline: e.target.value })}
-              className="w-full px-3 py-2 text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500"
+              className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1">
+            <label className="block text-xs font-semibold text-slate-700 mb-1">
               Priority
             </label>
             <select
               value={adjustModal.priority}
               onChange={(e) => setAdjustModal({ ...adjustModal, priority: e.target.value })}
-              className="w-full px-3 py-2 text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500"
+              className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900"
             >
-              <option value="URGENT">URGENT</option>
-              <option value="HIGH">HIGH</option>
-              <option value="MEDIUM">MEDIUM</option>
-              <option value="LOW">LOW</option>
+              <option value="URGENT">Urgent</option>
+              <option value="HIGH">High</option>
+              <option value="MEDIUM">Medium</option>
+              <option value="LOW">Low</option>
             </select>
           </div>
 
-          <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200 dark:border-slate-800">
+          <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
             <Button
               variant="ghost"
               onClick={() =>
@@ -355,13 +341,15 @@ export const AiTaskAllocationSection = ({
             >
               Cancel
             </Button>
-            <Button type="submit" variant="primary">
-              Approve with Adjustments
-            </Button>
+            <button
+              type="submit"
+              className="px-4 py-2 rounded-lg bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800 cursor-pointer"
+            >
+              Approve with Changes
+            </button>
           </div>
         </form>
       </Modal>
     </div>
   );
 };
-

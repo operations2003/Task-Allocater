@@ -5,7 +5,7 @@
 @layer base {
   body {
     font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-    @apply bg-slate-50;
+    @apply bg-slate-50 text-slate-800;
   }
 
   select::-ms-expand {
@@ -13,96 +13,31 @@
   }
 }
 
-/* Custom modern scrollbars - Executive theme */
+/* Subtle, standard scrollbar */
 ::-webkit-scrollbar {
-  width: 7px;
-  height: 7px;
+  width: 6px;
+  height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #f8fafc;
+  background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #4F46E5;
+  background: #cbd5e1;
   border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #4338CA;
+  background: #94a3b8;
 }
 
-/* Glassmorphism helpers */
-.glass-header {
-  background: rgba(255, 255, 255, 0.88);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-}
-
-.glass-card {
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-}
-
-/* TaskNera gradient backgrounds */
-.tasknera-gradient {
-  background: linear-gradient(135deg, #F0F3FF 0%, #FFFFFF 50%, #F8FAFC 100%);
-}
-
-.tasknera-hero-gradient {
-  background: linear-gradient(135deg, #0F172A 0%, #1E1B4B 50%, #0F172A 100%);
-}
-
-.tasknera-brand-gradient {
-  background: linear-gradient(135deg, #4F46E5 0%, #6366F1 50%, #4338CA 100%);
-}
-
-.tasknera-glow {
-  box-shadow: 0 0 40px -10px rgba(79, 70, 229, 0.25);
-}
-
-/* Smooth animations */
-@keyframes fade-in {
-  from {
-    opacity: 0;
-    transform: translateY(-6px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.animate-fade-in {
-  animation: fade-in 0.2s ease-out;
-}
-
-/* Focus states with Executive Royal Indigo */
+/* Standard focus state */
 *:focus-visible {
-  outline: 2px solid #4F46E5;
+  outline: 2px solid #0f172a;
   outline-offset: 2px;
 }
 
-/* Creative Modern Utilities */
-.aurora-mesh {
-  background-color: #f8fafc;
-  background-image: 
-    radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.07) 0px, transparent 50%),
-    radial-gradient(at 100% 0%, rgba(6, 182, 212, 0.07) 0px, transparent 50%),
-    radial-gradient(at 50% 100%, rgba(139, 92, 246, 0.04) 0px, transparent 50%);
-}
-
-/* Creative Card Micro-interactions */
-.card-creative {
-  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-}
-.card-creative:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 12px 28px -6px rgba(15, 23, 42, 0.08), 0 0 1px 1px rgba(99, 102, 241, 0.15);
-}
-
-/* Creative Enterprise Typography */
-h1, h2, h3, .font-heading {
-  font-family: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, sans-serif;
-  letter-spacing: -0.02em;
+/* Clean typography */
+h1, h2, h3, h4, .font-heading {
+  letter-spacing: -0.015em;
 }
 
 /* Official Print & PDF Export Formatting */
@@ -127,7 +62,6 @@ h1, h2, h3, .font-heading {
   }
 }
 
-/* Fix scattered words & clipped text in PDF export */
 .pdf-export-container {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
   letter-spacing: normal !important;
@@ -145,4 +79,3 @@ h1, h2, h3, .font-heading {
   word-spacing: normal !important;
   box-sizing: border-box !important;
 }
-

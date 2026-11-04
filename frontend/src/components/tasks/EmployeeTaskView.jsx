@@ -1,19 +1,10 @@
 import React, { useState } from 'react';
 import {
-  CheckSquare,
-  Clock,
   Calendar,
-  AlertTriangle,
-  PlayCircle,
   CheckCircle2,
   Sliders,
-  Send,
-  MessageSquare,
-  ShieldCheck,
-  Sparkles,
-  Link as LinkIcon,
+  Clock,
   Search,
-  Filter,
 } from 'lucide-react';
 import { Badge } from '../common/Badge.jsx';
 import { Button } from '../common/Button.jsx';
@@ -25,16 +16,11 @@ export const EmployeeTaskView = ({
   currentUser,
   onUpdateProgress,
   onRequestExtension,
-  onAddComment,
-  onToggleSubtask,
 }) => {
   const [activeTab, setActiveTab] = useState('ALL'); // 'ALL' | 'TODAY' | 'UPCOMING' | 'OVERDUE' | 'COMPLETED'
   const [search, setSearch] = useState('');
-  const [selectedTask, setSelectedTask] = useState(null);
   const [progressModalTask, setProgressModalTask] = useState(null);
   const [extensionModalTask, setExtensionModalTask] = useState(null);
-  const [commentText, setCommentText] = useState('');
-  const [isCommentSubmitting, setIsCommentSubmitting] = useState(false);
 
   const todayStr = new Date().toISOString().split('T')[0];
 
@@ -62,35 +48,23 @@ export const EmployeeTaskView = ({
     return true;
   });
 
-  const handlePostComment = async (e) => {
-    e.preventDefault();
-    if (!commentText.trim() || !selectedTask) return;
-    try {
-      setIsCommentSubmitting(true);
-      await onAddComment(selectedTask.id, commentText);
-      setCommentText('');
-    } finally {
-      setIsCommentSubmitting(false);
-    }
-  };
-
   return (
     <div className="space-y-6">
-      {/* Employee Workspace Header Banner */}
-      <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      {/* Header */}
+      <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
-            <span>My Tasks & Daily Workplan</span>
-            <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-brand-50 text-brand-700 dark:bg-brand-950/60 dark:text-brand-300">
-              {myTasks.length} Assigned
+          <h1 className="text-base font-bold text-slate-900 flex items-center gap-2">
+            <span>My Tasks</span>
+            <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700">
+              {myTasks.length} tasks
             </span>
-          </h2>
+          </h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Track your operational tasks, submit daily deliverables, and coordinate directly with task issuers.
+            View assigned work, log progress, and request deadline adjustments.
           </p>
         </div>
 
-        {/* Quick Search */}
+        {/* Search */}
         <div className="relative w-full sm:w-64">
           <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
@@ -98,16 +72,16 @@ export const EmployeeTaskView = ({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search my tasks..."
-            className="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500"
+            className="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900"
           />
         </div>
       </div>
 
       {/* Tabs Filter Bar */}
-      <div className="flex items-center gap-2 overflow-x-auto text-xs pb-1">
+      <div className="flex items-center gap-1.5 overflow-x-auto text-xs pb-1">
         {[
           { id: 'ALL', label: 'All Tasks' },
-          { id: 'TODAY', label: "Today's Tasks" },
+          { id: 'TODAY', label: "Due Today" },
           { id: 'UPCOMING', label: 'Upcoming' },
           { id: 'OVERDUE', label: 'Overdue' },
           { id: 'COMPLETED', label: 'Completed' },
@@ -115,10 +89,10 @@ export const EmployeeTaskView = ({
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer shrink-0 ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer shrink-0 ${
               activeTab === tab.id
-                ? 'bg-brand-600 text-white shadow-brand'
-                : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-800 hover:bg-slate-50'
+                ? 'bg-slate-900 text-white font-semibold'
+                : 'text-slate-600 hover:bg-slate-100'
             }`}
           >
             {tab.label}
@@ -129,9 +103,9 @@ export const EmployeeTaskView = ({
       {/* Tasks List */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {myTasks.length === 0 ? (
-          <div className="col-span-full bg-white dark:bg-slate-900 rounded-2xl p-12 text-center border border-slate-200 dark:border-slate-800">
-            <CheckCircle2 className="w-10 h-10 text-brand-500 mx-auto mb-2" />
-            <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200">No Tasks in this View</h4>
+          <div className="col-span-full bg-white rounded-xl p-12 text-center border border-slate-200">
+            <CheckCircle2 className="w-8 h-8 text-emerald-500 mx-auto mb-2" />
+            <h3 className="text-sm font-semibold text-slate-800">No Tasks in this View</h3>
             <p className="text-xs text-slate-400 mt-1">You are up to date on all items for this filter.</p>
           </div>
         ) : (
@@ -140,39 +114,26 @@ export const EmployeeTaskView = ({
             const isOverdue =
               t.is_overdue ||
               (t.due_date && String(t.due_date).split('T')[0] < todayStr && !isCompleted);
-            const isCeo = t.assigned_by === 'CEO' || t.is_official;
-            const isAi = t.assigned_by === 'AI' || t.is_ai_assigned;
 
             return (
               <div
                 key={t.id}
-                className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm p-4 space-y-3.5 flex flex-col justify-between hover:border-brand-300 dark:hover:border-brand-800 transition-all"
+                className="bg-white rounded-xl border border-slate-200 shadow-xs p-4 space-y-3 flex flex-col justify-between hover:border-slate-300 transition-colors"
               >
                 <div className="space-y-2">
-                  {/* Top Origin & Priority Badges */}
-                  <div className="flex items-center justify-between gap-2 flex-wrap">
-                    {isCeo ? (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
-                        <ShieldCheck className="w-3 h-3 text-amber-600" /> CEO Directive
-                      </span>
-                    ) : isAi ? (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-purple-50 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
-                        <Sparkles className="w-3 h-3 text-purple-600" /> AI Engine
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                        Manager Assigned
-                      </span>
-                    )}
-
-                    <Badge variant={t.priority === 'URGENT' ? 'danger' : 'warning'}>
+                  {/* Top Badges */}
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
+                      {t.status || 'TODO'}
+                    </span>
+                    <Badge variant={t.priority === 'URGENT' ? 'danger' : 'neutral'}>
                       {t.priority || 'MEDIUM'}
                     </Badge>
                   </div>
 
-                  {/* Title & Desc */}
+                  {/* Title & Description */}
                   <div>
-                    <h3 className="text-sm font-bold text-slate-900 dark:text-white line-clamp-2" title={t.title}>
+                    <h3 className="text-sm font-bold text-slate-900 line-clamp-2" title={t.title}>
                       {t.title}
                     </h3>
                     {t.description && (
@@ -185,16 +146,16 @@ export const EmployeeTaskView = ({
                   {/* Progress Bar */}
                   <div className="space-y-1 pt-1">
                     <div className="flex items-center justify-between text-[11px]">
-                      <span className="text-slate-400 font-medium">Progress:</span>
-                      <span className="font-bold text-slate-700 dark:text-slate-200">{t.progress || 0}%</span>
+                      <span className="text-slate-400">Progress</span>
+                      <span className="font-semibold text-slate-800">{t.progress || 0}%</span>
                     </div>
-                    <div className="w-full bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                    <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
                       <div
                         className={`h-full rounded-full ${
                           (t.progress || 0) >= 100
                             ? 'bg-emerald-500'
                             : (t.progress || 0) >= 50
-                            ? 'bg-brand-500'
+                            ? 'bg-slate-800'
                             : 'bg-amber-500'
                         }`}
                         style={{ width: `${t.progress || 0}%` }}
@@ -203,38 +164,38 @@ export const EmployeeTaskView = ({
                   </div>
 
                   {/* Deadline Info */}
-                  <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-100 dark:border-slate-800">
-                    <span className="text-slate-400 flex items-center gap-1 text-[11px]">
-                      <Calendar className="w-3.5 h-3.5" />
+                  <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-100">
+                    <span className="text-slate-500 flex items-center gap-1 text-[11px]">
+                      <Calendar className="w-3.5 h-3.5 text-slate-400" />
                       {t.due_date ? String(t.due_date).split('T')[0] : 'No deadline'}
                     </span>
                     {isOverdue && (
-                      <span className="text-[10px] font-bold text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded">
+                      <span className="text-[10px] font-semibold text-rose-600 bg-rose-50 px-1.5 py-0.2 rounded">
                         Overdue
                       </span>
                     )}
                   </div>
                 </div>
 
-                {/* Card Actions: Update Progress & Request Extension */}
-                <div className="flex items-center gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
-                  <Button
-                    variant="outline"
+                {/* Actions */}
+                <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
+                  <button
+                    type="button"
                     onClick={() => setProgressModalTask(t)}
-                    className="flex-1 text-xs py-1.5 inline-flex items-center justify-center gap-1.5"
+                    className="flex-1 text-xs py-1.5 px-3 rounded-lg bg-slate-900 text-white font-medium hover:bg-slate-800 transition-colors inline-flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
                   >
                     <Sliders className="w-3.5 h-3.5" /> Update Progress
-                  </Button>
+                  </button>
 
                   {!isCompleted && (
-                    <Button
-                      variant="ghost"
+                    <button
+                      type="button"
                       onClick={() => setExtensionModalTask(t)}
-                      className="text-xs text-amber-600 hover:text-amber-700 py-1.5 px-2"
-                      title="Request Deadline Extension"
+                      className="text-xs text-slate-500 hover:text-slate-800 p-1.5 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+                      title="Request Extension"
                     >
-                      <Clock className="w-3.5 h-3.5" />
-                    </Button>
+                      <Clock className="w-4 h-4" />
+                    </button>
                   )}
                 </div>
               </div>
@@ -260,4 +221,3 @@ export const EmployeeTaskView = ({
     </div>
   );
 };
-

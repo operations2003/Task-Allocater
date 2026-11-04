@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ShieldCheck, Plus, Trash2, Calendar, AlertCircle, Users, Tag, Clock, Building2 } from 'lucide-react';
+import { Plus, Trash2, AlertCircle } from 'lucide-react';
 import { Modal } from '../common/Modal.jsx';
 import { Button } from '../common/Button.jsx';
 import { filterNonCeoEmployees } from '../../utils/roleUtils.js';
@@ -32,7 +32,7 @@ export const CeoTaskCreateModal = ({
   const activeEmployees = Array.isArray(employees) && employees.length > 0 ? employees : DEFAULT_COMPANY_EMPLOYEES;
   const activeDepartments = Array.isArray(departments) && departments.length > 0 ? departments : DEFAULT_COMPANY_DEPARTMENTS;
 
-  // CRITICAL BUSINESS RULE: Filter out CEO so they NEVER appear in assignee dropdown
+  // Filter out CEO so they never appear in assignee dropdown
   const nonCeoStaff = filterNonCeoEmployees(activeEmployees);
 
   const [formData, setFormData] = useState({
@@ -79,12 +79,12 @@ export const CeoTaskCreateModal = ({
     }
 
     if (!formData.assigneeId) {
-      setError('Please select an operational employee to assign this task.');
+      setError('Please select an assignee.');
       return;
     }
 
     if (!formData.dueDate) {
-      setError('Please specify a due date for this directive.');
+      setError('Please specify a due date.');
       return;
     }
 
@@ -114,7 +114,7 @@ export const CeoTaskCreateModal = ({
       setSubtasks(['']);
       onClose();
     } catch (err) {
-      setError(err.message || 'Failed to issue official task.');
+      setError(err.message || 'Failed to create task.');
     } finally {
       setIsSubmitting(false);
     }
@@ -124,43 +124,11 @@ export const CeoTaskCreateModal = ({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="Issue Official Organisational Task"
-      subtitle="Direct executive assignment across company departments"
-      maxWidth="max-w-2xl"
+      title="New Task"
+      subtitle="Assign a task to any team member"
+      maxWidth="max-w-xl"
     >
-      <form onSubmit={handleSubmit} className="p-6 space-y-4">
-        {/* CEO Directive Banner & Assigner Identification */}
-        <div className="space-y-3">
-          <div className="flex items-center gap-2.5 p-3 rounded-xl bg-brand-50 dark:bg-brand-950/40 border border-brand-200 dark:border-brand-900/60 text-brand-800 dark:text-brand-200 text-xs">
-            <ShieldCheck className="w-5 h-5 text-brand-600 dark:text-brand-400 shrink-0" />
-            <span>
-              <strong>Official Executive Directive:</strong> As CEO, tasks assigned here bypass reporting hierarchies and are issued company-wide with highest priority visibility.
-            </span>
-          </div>
-
-          <div className="flex items-center justify-between p-3 rounded-xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80">
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-full bg-brand-600 text-white flex items-center justify-center font-black text-xs shadow-sm">
-                CEO
-              </div>
-              <div>
-                <div className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400 tracking-wider">
-                  Assigned By (Task Issuer)
-                </div>
-                <div className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-                  <span>Vikram Malhotra</span>
-                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-brand-100 text-brand-800 dark:bg-brand-950 dark:text-brand-300 border border-brand-200 dark:border-brand-800">
-                    Chief Executive Officer
-                  </span>
-                </div>
-              </div>
-            </div>
-            <div className="text-right text-[11px] text-slate-500 dark:text-slate-400 font-semibold hidden sm:block">
-              Executive Authority
-            </div>
-          </div>
-        </div>
-
+      <form onSubmit={handleSubmit} className="p-5 space-y-4">
         {error && (
           <div className="flex items-center gap-2 p-3 text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded-lg">
             <AlertCircle className="w-4 h-4 shrink-0" />
@@ -170,53 +138,45 @@ export const CeoTaskCreateModal = ({
 
         {/* Task Title */}
         <div>
-          <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1">
-            Task Directive Title <span className="text-rose-500">*</span>
+          <label className="block text-xs font-semibold text-slate-700 mb-1">
+            Task Title <span className="text-rose-500">*</span>
           </label>
           <input
             type="text"
             required
             value={formData.title}
             onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-            placeholder="e.g. Conduct Q4 Security Architecture & Encryption Key Audit"
-            className="w-full px-3 py-2 text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500"
+            placeholder="e.g. Update infrastructure documentation"
+            className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-lg text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900"
           />
         </div>
 
         {/* Description */}
         <div>
-          <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1">
-            Directive Scope & Deliverables
+          <label className="block text-xs font-semibold text-slate-700 mb-1">
+            Description
           </label>
           <textarea
             rows="3"
             value={formData.description}
             onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-            placeholder="Detail objectives, acceptance criteria, sensitive constraints, or dependencies..."
-            className="w-full px-3 py-2 text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500"
+            placeholder="Key deliverables, requirements, or links..."
+            className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-lg text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900"
           />
         </div>
 
-        {/* 2-column Grid: Target Department & Assignee (with Department Breakdown Optgroups) */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {/* 2-column Grid: Department & Assignee (with Optgroups) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1">
-              Target Department
+            <label className="block text-xs font-semibold text-slate-700 mb-1">
+              Department
             </label>
             <select
               value={formData.deptId}
-              onChange={(e) => {
-                const newDeptId = e.target.value;
-                setFormData((prev) => ({
-                  ...prev,
-                  deptId: newDeptId,
-                  // Reset assignee if they belong to a different department
-                  assigneeId: prev.assigneeId,
-                }));
-              }}
-              className="w-full px-3 py-2 text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500"
+              onChange={(e) => setFormData({ ...formData, deptId: e.target.value })}
+              className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900"
             >
-              <option value="">All / Cross-Department</option>
+              <option value="">All Departments</option>
               {activeDepartments.map((dept) => (
                 <option key={dept.id || dept.dept_id} value={dept.id || dept.dept_id}>
                   {dept.name}
@@ -226,11 +186,8 @@ export const CeoTaskCreateModal = ({
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1 flex items-center justify-between">
-              <span>Assign To (Team Member) <span className="text-rose-500">*</span></span>
-              <span className="text-[10px] font-medium text-slate-400 normal-case">
-                {filteredAssignees.length} Available Staff
-              </span>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">
+              Assign to <span className="text-rose-500">*</span>
             </label>
             <select
               required
@@ -243,28 +200,24 @@ export const CeoTaskCreateModal = ({
                   deptId: emp?.dept_id || emp?.deptId || formData.deptId,
                 });
               }}
-              className="w-full px-3 py-2 text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500"
+              className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900"
             >
-              <option value="">Select Team Member to Execute Directive</option>
-              
-              {/* Department-Categorized Breakdown */}
+              <option value="">Select team member</option>
               {activeDepartments.map((dept) => {
-                const deptMembers = filteredAssignees.filter((emp) => {
-                  const empDept = emp.dept_id || emp.deptId || emp.department_id;
-                  const deptId = dept.id || dept.dept_id;
-                  return empDept === deptId || (emp.dept_name && emp.dept_name === dept.name);
-                });
-
-                if (deptMembers.length === 0) return null;
+                const deptId = dept.id || dept.dept_id;
+                const members = filteredAssignees.filter(
+                  (e) => (e.dept_id || e.deptId) === deptId || e.dept_name === dept.name
+                );
+                if (members.length === 0) return null;
 
                 return (
-                  <optgroup key={dept.id || dept.name} label={`── ${dept.name} ──`}>
-                    {deptMembers.map((emp) => {
-                      const name = emp.fullName || `${emp.firstName || emp.first_name || ''} ${emp.lastName || emp.last_name || ''}`.trim() || emp.name || 'Employee';
-                      const desig = emp.desig_title || emp.designationTitle || emp.designation?.title || 'Specialist';
+                  <optgroup key={deptId} label={dept.name}>
+                    {members.map((emp) => {
+                      const name = emp.fullName || `${emp.firstName || emp.first_name || ''} ${emp.lastName || emp.last_name || ''}`.trim() || 'Employee';
+                      const desig = emp.desig_title || emp.designationTitle || emp.designation?.title || emp.dept_name || emp.departmentName || '';
                       return (
                         <option key={emp.id} value={emp.id}>
-                          {name} — {desig}
+                          {name} {desig ? `— ${desig}` : ''}
                         </option>
                       );
                     })}
@@ -272,14 +225,19 @@ export const CeoTaskCreateModal = ({
                 );
               })}
 
-              {/* Staff without direct department mapping */}
+              {/* Members without explicit department */}
               {filteredAssignees.filter((e) => !e.dept_id && !e.deptId && !e.dept_name).length > 0 && (
-                <optgroup label="── General Operational Staff ──">
-                  {filteredAssignees.filter((e) => !e.dept_id && !e.deptId && !e.dept_name).map((emp) => (
-                    <option key={emp.id} value={emp.id}>
-                      {emp.first_name} {emp.last_name}
-                    </option>
-                  ))}
+                <optgroup label="General Staff">
+                  {filteredAssignees
+                    .filter((e) => !e.dept_id && !e.deptId && !e.dept_name)
+                    .map((emp) => {
+                      const name = emp.fullName || `${emp.firstName || emp.first_name || ''} ${emp.lastName || emp.last_name || ''}`.trim() || 'Employee';
+                      return (
+                        <option key={emp.id} value={emp.id}>
+                          {name}
+                        </option>
+                      );
+                    })}
                 </optgroup>
               )}
             </select>
@@ -287,71 +245,71 @@ export const CeoTaskCreateModal = ({
         </div>
 
         {/* 2-column Grid: Priority & Due Date */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1">
-              Priority Level
+            <label className="block text-xs font-semibold text-slate-700 mb-1">
+              Priority
             </label>
             <select
               value={formData.priority}
               onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
-              className="w-full px-3 py-2 text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500"
+              className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900"
             >
-              <option value="URGENT">Urgent (CEO Directive)</option>
-              <option value="HIGH">High Priority</option>
+              <option value="URGENT">Urgent</option>
+              <option value="HIGH">High</option>
               <option value="MEDIUM">Medium</option>
               <option value="LOW">Low</option>
             </select>
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1">
-              Deadline <span className="text-rose-500">*</span>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">
+              Due Date <span className="text-rose-500">*</span>
             </label>
             <input
               type="date"
               required
-              min={new Date().toISOString().split('T')[0]}
               value={formData.dueDate}
+              min={new Date().toISOString().split('T')[0]}
               onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
-              className="w-full px-3 py-2 text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500"
+              className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900"
             />
           </div>
         </div>
 
-        {/* Structured Milestone Subtasks */}
-        <div className="space-y-2 pt-2 border-t border-slate-200 dark:border-slate-800">
+        {/* Subtasks */}
+        <div className="space-y-2 pt-2 border-t border-slate-100">
           <div className="flex items-center justify-between">
-            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
-              Operational Subtasks & Milestones
+            <label className="block text-xs font-semibold text-slate-700">
+              Subtasks (optional)
             </label>
             <button
               type="button"
               onClick={addSubtaskField}
-              className="inline-flex items-center gap-1 text-xs text-brand-600 dark:text-brand-400 hover:text-brand-700 font-bold cursor-pointer"
+              className="inline-flex items-center gap-1 text-xs text-slate-700 hover:text-slate-900 font-medium cursor-pointer"
             >
-              <Plus className="w-3.5 h-3.5" />
-              Add Subtask
+              <Plus className="w-3.5 h-3.5" /> Add Subtask
             </button>
           </div>
 
-          <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
-            {subtasks.map((task, index) => (
-              <div key={index} className="flex items-center gap-2">
+          <div className="space-y-2 max-h-36 overflow-y-auto pr-1">
+            {subtasks.map((st, idx) => (
+              <div key={idx} className="flex items-center gap-2">
+                <span className="text-xs text-slate-400 font-semibold w-4 text-center">{idx + 1}.</span>
                 <input
                   type="text"
-                  value={task}
-                  onChange={(e) => handleSubtaskChange(index, e.target.value)}
-                  placeholder={`Milestone #${index + 1} specification...`}
-                  className="flex-1 px-3 py-1.5 text-xs bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500"
+                  value={st}
+                  onChange={(e) => handleSubtaskChange(idx, e.target.value)}
+                  placeholder={`Step ${idx + 1}...`}
+                  className="flex-1 px-2.5 py-1.5 text-xs bg-white border border-slate-300 rounded-md text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900"
                 />
                 {subtasks.length > 1 && (
                   <button
                     type="button"
-                    onClick={() => removeSubtaskField(index)}
-                    className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-md transition-colors"
+                    onClick={() => removeSubtaskField(idx)}
+                    className="p-1 text-slate-400 hover:text-rose-500 rounded transition-colors cursor-pointer"
                   >
-                    <Trash2 className="w-4 h-4" />
+                    <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 )}
               </div>
@@ -359,14 +317,18 @@ export const CeoTaskCreateModal = ({
           </div>
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200 dark:border-slate-800">
+        {/* Footer Actions */}
+        <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
           <Button variant="ghost" onClick={onClose} disabled={isSubmitting}>
             Cancel
           </Button>
-          <Button type="submit" variant="primary" disabled={isSubmitting}>
-            {isSubmitting ? 'Issuing Directive...' : 'Issue Official Directive'}
-          </Button>
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className="px-4 py-2 rounded-lg bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800 transition-colors shadow-xs cursor-pointer disabled:opacity-50"
+          >
+            {isSubmitting ? 'Creating...' : 'Create Task'}
+          </button>
         </div>
       </form>
     </Modal>
