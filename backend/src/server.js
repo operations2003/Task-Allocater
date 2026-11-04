@@ -14,12 +14,12 @@ const startServer = async () => {
 
     const port = config.port || 5000;
 
-    app.listen(port, () => {
+    app.listen(port, '0.0.0.0', () => {
       console.log('====================================================');
       console.log(`👑 TaskNera CEO Command Centre Backend Server Online`);
       console.log(`📡 Environment : ${config.nodeEnv || 'development'}`);
-      console.log(`🌐 API Base    : http://localhost:${port}/api`);
-      console.log(`🩺 Health Check: http://localhost:${port}/api/v1/health`);
+      console.log(`🌐 API Base    : http://127.0.0.1:${port}/api`);
+      console.log(`🩺 Health Check: http://127.0.0.1:${port}/api/v1/health`);
       console.log('====================================================');
     });
   } catch (error) {

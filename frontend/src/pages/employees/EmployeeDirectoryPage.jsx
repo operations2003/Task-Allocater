@@ -226,3 +226,4 @@ export const EmployeeDirectoryPage = () => {
     </div>
   );
 };
+
