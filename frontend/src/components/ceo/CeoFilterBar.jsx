@@ -75,9 +75,7 @@ export const CeoFilterBar = ({
 
         {/* Employee Assignee Filter (Excluding CEO) */}
         <div>
-          <label className="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
-            Assignee
-          </label>
+          <label className="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Assigned To (Staff)</label>
           <select
             value={filters.assigneeId || ''}
             onChange={(e) => handleFilterChange('assigneeId', e.target.value)}

@@ -110,6 +110,29 @@ export const CeoTaskCreateModal = ({
           </span>
         </div>
 
+        {/* Executive Assigner Visual Badge */}
+        <div className="flex items-center justify-between p-3 rounded-xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-full bg-brand-600 text-white flex items-center justify-center font-black text-xs shadow-sm">
+              CEO
+            </div>
+            <div>
+              <div className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400 tracking-wider">
+                Assigned By (Task Issuer)
+              </div>
+              <div className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                <span>Vikram Malhotra</span>
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-brand-100 text-brand-800 dark:bg-brand-950 dark:text-brand-300 border border-brand-200 dark:border-brand-800">
+                  Chief Executive Officer
+                </span>
+              </div>
+            </div>
+          </div>
+          <div className="text-right text-[11px] text-slate-500 dark:text-slate-400 font-semibold hidden sm:block">
+            Autonomous Authority
+          </div>
+        </div>
+
         {error && (
           <div className="flex items-center gap-2 p-3 text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded-lg">
             <AlertCircle className="w-4 h-4 shrink-0" />
@@ -150,7 +173,7 @@ export const CeoTaskCreateModal = ({
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1">
-              Assignee <span className="text-rose-500">*</span>
+              Assign To (Team Member / Employee) <span className="text-rose-500">*</span>
             </label>
             <select
               required
@@ -165,7 +188,7 @@ export const CeoTaskCreateModal = ({
               }}
               className="w-full px-3 py-2 text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500"
             >
-              <option value="">Select Operational Assignee</option>
+              <option value="">Select Team Member to Execute Directive</option>
               {assignableEmployees.map((emp) => {
                 const name = emp.fullName || `${emp.firstName || emp.first_name || ''} ${emp.lastName || emp.last_name || ''}`.trim() || 'Employee';
                 const desig = emp.designationTitle || emp.designation?.title || emp.departmentName || '';

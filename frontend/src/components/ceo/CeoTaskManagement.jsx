@@ -113,7 +113,7 @@ export const CeoTaskManagement = ({
             <thead>
               <tr className="bg-slate-50/80 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-wider text-[10px]">
                 <th className="py-3 px-4">Directive & Scope</th>
-                <th className="py-3 px-3">Assignee & Dept</th>
+                <th className="py-3 px-3">Assigned To & Dept</th>
                 <th className="py-3 px-3">Source</th>
                 <th className="py-3 px-3">Priority</th>
                 <th className="py-3 px-3">Deadline</th>
