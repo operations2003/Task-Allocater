@@ -1,37 +1,42 @@
 import { taskService } from '../services/taskService.js';
+import { auditService } from '../services/auditService.js';
 import { sendSuccess, sendError } from '../utils/apiResponse.js';
 
 export const taskController = {
-  async list(req, res, next) {
+  async listMyTasks(req, res, next) {
     try {
-      const orgId = req.user.orgId || 'org-1';
-      const tasks = await taskService.listTasks(orgId, req.user, req.query);
-      return sendSuccess(res, 'Tasks retrieved successfully.', tasks);
+      const orgId = req.user.orgId || 'org-tasknera-ceo';
+      const tasks = await taskService.getMyTasks(orgId, req.user, req.query);
+      return sendSuccess(res, 'Assigned tasks retrieved successfully.', tasks);
     } catch (error) {
       next(error);
     }
   },
 
-  async create(req, res, next) {
-    try {
-      const orgId = req.user.orgId || 'org-1';
-      const task = await taskService.createTask(orgId, req.user, req.body);
-      return sendSuccess(res, 'Task created successfully.', task, null, 201);
-    } catch (error) {
-      if (error.statusCode) return sendError(res, error.message, error.statusCode);
-      next(error);
-    }
-  },
-
-  async updateStatus(req, res, next) {
+  async updateProgress(req, res, next) {
     try {
       const { id } = req.params;
-      const { status } = req.body;
-      const orgId = req.user.orgId || 'org-1';
-      const updated = await taskService.updateStatus(id, orgId, req.user, status);
-      return sendSuccess(res, 'Task status updated.', updated);
+      const orgId = req.user.orgId || 'org-tasknera-ceo';
+      const updated = await taskService.updateProgress(id, orgId, req.user, req.body);
+      return sendSuccess(res, 'Task progress updated successfully.', updated);
     } catch (error) {
-      if (error.statusCode) return sendError(res, error.message, error.statusCode);
+      if (error.message.includes('Access denied')) {
+        return sendError(res, error.message, 403);
+      }
+      next(error);
+    }
+  },
+
+  async requestExtension(req, res, next) {
+    try {
+      const { id } = req.params;
+      const orgId = req.user.orgId || 'org-tasknera-ceo';
+      const result = await taskService.requestDeadlineExtension(id, orgId, req.user, req.body);
+      return sendSuccess(res, result.message, result);
+    } catch (error) {
+      if (error.message.includes('Access denied')) {
+        return sendError(res, error.message, 403);
+      }
       next(error);
     }
   },
@@ -40,11 +45,10 @@ export const taskController = {
     try {
       const { id } = req.params;
       const { text } = req.body;
-      const orgId = req.user.orgId || 'org-1';
+      const orgId = req.user.orgId || 'org-tasknera-ceo';
       const updated = await taskService.addComment(id, orgId, req.user, text);
       return sendSuccess(res, 'Comment posted successfully.', updated);
     } catch (error) {
-      if (error.statusCode) return sendError(res, error.message, error.statusCode);
       next(error);
     }
   },
@@ -53,51 +57,22 @@ export const taskController = {
     try {
       const { id } = req.params;
       const { subtasks } = req.body;
-      const orgId = req.user.orgId || 'org-1';
-      const updated = await taskService.updateSubtasks(id, orgId, subtasks, req.user);
-      return sendSuccess(res, 'Subtasks updated.', updated);
+      const orgId = req.user.orgId || 'org-tasknera-ceo';
+      const updated = await taskService.updateSubtasks(id, orgId, req.user, subtasks);
+      return sendSuccess(res, 'Subtasks updated successfully.', updated);
     } catch (error) {
-      if (error.statusCode) return sendError(res, error.message, error.statusCode);
       next(error);
     }
   },
 
-  async getMyPerformance(req, res, next) {
-    try {
-      const orgId = req.user.orgId || 'org-1';
-      const timeframe = req.query.timeframe || 'this_month';
-      const metrics = await taskService.getMyPerformance(orgId, req.user, timeframe);
-      return sendSuccess(res, 'Task performance metrics retrieved successfully.', metrics);
-    } catch (error) {
-      if (error.statusCode) return sendError(res, error.message, error.statusCode);
-      next(error);
-    }
-  },
-
-  async rate(req, res, next) {
+  async getAuditTrail(req, res, next) {
     try {
       const { id } = req.params;
-      const { rating, feedback } = req.body;
-      const orgId = req.user.orgId || 'org-1';
-      const rated = await taskService.rateTask(id, orgId, req.user, { rating, feedback });
-      return sendSuccess(res, 'Task rated successfully.', rated);
+      const orgId = req.user.orgId || 'org-tasknera-ceo';
+      const history = await auditService.getTaskHistory(id, orgId);
+      return sendSuccess(res, 'Task history retrieved successfully.', history);
     } catch (error) {
-      if (error.statusCode) return sendError(res, error.message, error.statusCode);
-      next(error);
-    }
-  },
-
-  async reopen(req, res, next) {
-    try {
-      const { id } = req.params;
-      const { reason } = req.body;
-      const orgId = req.user.orgId || 'org-1';
-      const reopened = await taskService.reopenTask(id, orgId, req.user, { reason });
-      return sendSuccess(res, 'Task reopened successfully.', reopened);
-    } catch (error) {
-      if (error.statusCode) return sendError(res, error.message, error.statusCode);
       next(error);
     }
   },
 };
-

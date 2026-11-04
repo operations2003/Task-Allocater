@@ -1,158 +1,165 @@
 import React, { useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
+import { ShieldCheck, Mail, Lock, AlertCircle, ArrowRight, Sparkles } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext.jsx';
-import { Mail, Sparkles } from 'lucide-react';
-import { Input } from '../../components/common/Input.jsx';
-import { PasswordInput } from '../../components/common/PasswordInput.jsx';
-import { Button } from '../../components/common/Button.jsx';
-import { Alert } from '../../components/common/Alert.jsx';
-import { TaskNeraLogo } from '../../components/common/TaskNeraLogo.jsx';
+import { useToast } from '../../context/ToastContext.jsx';
 
 export const LoginPage = () => {
-  const navigate = useNavigate();
-  const location = useLocation();
+  const [email, setEmail] = useState('ceo@tasknera.com');
+  const [password, setPassword] = useState('TaskNera@Ceo2026!');
+  const [submitting, setSubmitting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
+
   const { login } = useAuth();
-
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [errors, setErrors] = useState({});
-  const [apiError, setApiError] = useState(null);
-  const [isLoading, setIsLoading] = useState(false);
-
-  const validate = () => {
-    const errs = {};
-    const normalized = email.trim().toLowerCase();
-    const isSpecialAdmin =
-      normalized === 'sheetalbedi@tasknera.com' ||
-      normalized === 'sheetaltasknera.com' ||
-      normalized === 'sheetal@tasknera.com' ||
-      normalized === 'shubhamtasknera.com' ||
-      normalized === 'shubham@tasknera.com' ||
-      normalized === 'nabila' ||
-      normalized === 'nabila@tasknera.com';
-
-    if (!email.trim()) {
-      errs.email = 'Email address or username is required.';
-    } else if (!isSpecialAdmin && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) && email.trim().includes('@')) {
-      errs.email = 'Please enter a valid email address.';
-    }
-
-    if (!password) {
-      errs.password = 'Password is required.';
-    }
-
-    setErrors(errs);
-    return Object.keys(errs).length === 0;
-  };
+  const toast = useToast();
+  const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setApiError(null);
+    if (!email.trim() || !password) {
+      setErrorMsg('Please enter both email and password.');
+      return;
+    }
 
-    if (!validate()) return;
-
-    setIsLoading(true);
     try {
-      await login(email, password);
-      const from = location.state?.from?.pathname || '/dashboard';
-      navigate(from, { replace: true });
+      setSubmitting(true);
+      setErrorMsg('');
+      const data = await login(email, password);
+      toast.success(`Welcome back, ${data.user.firstName || 'Executive'}!`);
+      if (data.user.role === 'CEO') {
+        navigate('/dashboard');
+      } else {
+        navigate('/my-tasks');
+      }
     } catch (err) {
-      setApiError({
-        message: err.message || 'Login failed. Please verify your credentials.',
-        errors: err.errors || [],
-      });
+      setErrorMsg(err.message || 'Login failed. Please verify your credentials.');
     } finally {
-      setIsLoading(false);
+      setSubmitting(false);
     }
   };
 
   return (
-    <div className="min-h-screen tasknera-gradient flex items-center justify-center p-4 sm:p-6 lg:p-8 relative overflow-hidden">
-      {/* Dynamic ambient background glow */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute -top-40 -left-40 w-96 h-96 bg-brand-500/10 rounded-full blur-3xl" />
-        <div className="absolute top-1/2 -right-40 w-96 h-96 bg-brand-500/15 rounded-full blur-3xl" />
-        <div className="absolute -bottom-40 left-1/3 w-80 h-80 bg-slate-400/10 rounded-full blur-3xl" />
-      </div>
-
-      <div className="w-full max-w-md relative z-10">
-        {/* Brand Header with Official Logo Lockup */}
-        <div className="text-center mb-7">
-          <div className="flex justify-center mb-4">
-            <TaskNeraLogo variant="full" size="md" />
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 flex flex-col justify-center items-center px-4 py-12 sm:px-6 lg:px-8 antialiased">
+      <div className="w-full max-w-md space-y-8">
+        {/* Brand Banner */}
+        <div className="text-center">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-tr from-brand-600 via-indigo-600 to-cyan-500 shadow-xl shadow-brand-500/20 border border-brand-400/30 mb-4">
+            <ShieldCheck className="w-9 h-9 text-white" />
           </div>
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand-50 border border-brand-200/70 text-brand-700 text-xs font-semibold shadow-sm">
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>Enterprise HR & Workforce Management</span>
+          <div className="flex items-center justify-center gap-1.5 leading-none">
+            <span className="text-2xl font-black text-white tracking-tight">Task</span>
+            <span className="text-2xl font-black text-cyan-400 tracking-tight">Nera</span>
           </div>
+          <h2 className="mt-2 text-lg font-bold text-slate-200">
+            CEO Command Centre
+          </h2>
+          <p className="mt-1 text-xs text-slate-400">
+            Autonomous Organisational Directives & AI Task Allocation Portal
+          </p>
         </div>
 
         {/* Login Card */}
-        <div className="bg-white/95 backdrop-blur-xl rounded-3xl p-7 sm:p-9 shadow-2xl border border-slate-200/80 shadow-slate-200/60">
-          <div className="mb-6 text-center sm:text-left">
-            <h2 className="text-2xl font-black text-slate-900 tracking-tight">Sign in to your portal</h2>
-            <p className="text-sm text-slate-500 mt-1">
-              Enter your corporate credentials or choose a test role
-            </p>
-          </div>
-
-          {apiError && (
-            <Alert
-              type="error"
-              title="Authentication Failed"
-              message={apiError.message}
-              errors={apiError.errors}
-              onClose={() => setApiError(null)}
-              className="mb-6"
-            />
+        <div className="bg-slate-900/90 backdrop-blur-xl border border-slate-800 rounded-2xl p-6 sm:p-8 shadow-2xl">
+          {errorMsg && (
+            <div className="mb-5 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
+              <span>{errorMsg}</span>
+            </div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-5">
-            <Input
-              label="Work Email"
-              id="email"
-              name="email"
-              type="text"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="name@company.com"
-              icon={Mail}
-              error={errors.email}
-              required
-            />
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                Executive or Employee Email
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                  <Mail className="w-4 h-4" />
+                </div>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="ceo@tasknera.com"
+                  required
+                  className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-slate-950/60 border border-slate-700/80 text-white placeholder-slate-500 text-xs focus:outline-none focus:ring-2 focus:ring-brand-500/50 focus:border-brand-500 transition-all"
+                />
+              </div>
+            </div>
 
-            <PasswordInput
-              label="Password"
-              id="password"
-              name="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter your password"
-              error={errors.password}
-              required
-            />
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                Security Password
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                  <Lock className="w-4 h-4" />
+                </div>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••••••"
+                  required
+                  className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-slate-950/60 border border-slate-700/80 text-white placeholder-slate-500 text-xs focus:outline-none focus:ring-2 focus:ring-brand-500/50 focus:border-brand-500 transition-all"
+                />
+              </div>
+            </div>
 
-            <Button
+            <button
               type="submit"
-              variant="primary"
-              size="lg"
-              className="w-full mt-3 shadow-lg shadow-brand-500/30"
-              isLoading={isLoading}
+              disabled={submitting}
+              className="w-full mt-2 flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-brand-600 via-indigo-600 to-cyan-600 hover:from-brand-500 hover:to-cyan-500 transition-all duration-200 shadow-md shadow-brand-500/25 disabled:opacity-50 cursor-pointer"
             >
-              Sign In
-            </Button>
+              {submitting ? (
+                <span>Authorizing Session...</span>
+              ) : (
+                <>
+                  <span>Access Command Centre</span>
+                  <ArrowRight className="w-4 h-4" />
+                </>
+              )}
+            </button>
           </form>
-        </div>
 
-        {/* Footer info */}
-        <div className="mt-8 text-center">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/80 backdrop-blur-sm border border-slate-200 shadow-sm">
-            <Sparkles className="w-4 h-4 text-brand-500" />
-            <span className="text-xs text-slate-600 font-medium">
-              Enterprise HRMS v1.0 • PostgreSQL Ready
+          {/* Quick Demo Credentials Assistant */}
+          <div className="mt-6 pt-5 border-t border-slate-800/80 text-center">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-2">
+              Default Provisioned Accounts
             </span>
+            <div className="grid grid-cols-2 gap-2 text-[11px]">
+              <button
+                type="button"
+                onClick={() => {
+                  setEmail('ceo@tasknera.com');
+                  setPassword('TaskNera@Ceo2026!');
+                }}
+                className="p-2 rounded-lg bg-slate-800/60 border border-slate-700 hover:border-brand-500/50 text-slate-300 hover:text-white transition-all text-left"
+              >
+                <div className="font-bold text-cyan-300 flex items-center gap-1">
+                  <ShieldCheck className="w-3 h-3" /> CEO Login
+                </div>
+                <div className="text-[10px] text-slate-400 truncate">ceo@tasknera.com</div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setEmail('aarav.sharma@tasknera.com');
+                  setPassword('TaskNera@Ceo2026!');
+                }}
+                className="p-2 rounded-lg bg-slate-800/60 border border-slate-700 hover:border-brand-500/50 text-slate-300 hover:text-white transition-all text-left"
+              >
+                <div className="font-bold text-indigo-300">Staff Login</div>
+                <div className="text-[10px] text-slate-400 truncate">aarav.sharma@tasknera.com</div>
+              </button>
+            </div>
           </div>
         </div>
+
+        <p className="text-center text-[11px] text-slate-500">
+          TaskNera Global Technologies • Standalone Executive Portal
+        </p>
       </div>
     </div>
   );

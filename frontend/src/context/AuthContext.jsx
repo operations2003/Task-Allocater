@@ -1,102 +1,59 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import { authService } from '../services/authService.js';
-import { attendanceService } from '../services/attendanceService.js';
 
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
+  const [token, setToken] = useState(() => localStorage.getItem('tasknera_ceo_token') || null);
   const [user, setUser] = useState(() => {
     try {
-      const stored = localStorage.getItem('hrms_user');
+      const stored = localStorage.getItem('tasknera_ceo_user');
       return stored ? JSON.parse(stored) : null;
     } catch {
       return null;
     }
   });
-  const [token, setToken] = useState(() => localStorage.getItem('hrms_token') || null);
-  const [loading, setLoading] = useState(() => {
-    try {
-      const storedToken = localStorage.getItem('hrms_token');
-      const storedUser = localStorage.getItem('hrms_user');
-      return !(storedToken && storedUser);
-    } catch {
-      return true;
-    }
-  });
-  const [todayAttendanceRecord, setTodayAttendanceRecord] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check session on mount if token exists
-    const checkAuth = async () => {
+    const verifySession = async () => {
       if (token) {
         try {
           const profile = await authService.getMe();
           setUser(profile);
-          localStorage.setItem('hrms_user', JSON.stringify(profile));
+          localStorage.setItem('tasknera_ceo_user', JSON.stringify(profile));
         } catch (err) {
-          console.warn('Session verification failed, logging out.', err);
+          console.warn('Session verification failed, resetting auth state.', err);
           setUser(null);
           setToken(null);
-          localStorage.removeItem('hrms_token');
-          localStorage.removeItem('hrms_user');
+          localStorage.removeItem('tasknera_ceo_token');
+          localStorage.removeItem('tasknera_ceo_user');
         }
+      } else {
+        setUser(null);
       }
       setLoading(false);
     };
 
-    checkAuth();
+    verifySession();
 
-    // Listen for custom expired event from api client
     const handleExpired = () => {
       setUser(null);
       setToken(null);
-      setTodayAttendanceRecord(null);
+      localStorage.removeItem('tasknera_ceo_token');
+      localStorage.removeItem('tasknera_ceo_user');
     };
-    window.addEventListener('hrms:auth:expired', handleExpired);
-    return () => window.removeEventListener('hrms:auth:expired', handleExpired);
+
+    window.addEventListener('tasknera:auth:expired', handleExpired);
+    return () => window.removeEventListener('tasknera:auth:expired', handleExpired);
   }, [token]);
-
-  const refreshWorkdayStatus = useCallback(async () => {
-    if (!token) {
-      setTodayAttendanceRecord(null);
-      return;
-    }
-    try {
-      const res = await attendanceService.getMyTodayRecord();
-      if (res && res.record !== undefined) {
-        setTodayAttendanceRecord(res.record);
-      } else if (res && res.todayRecord !== undefined) {
-        setTodayAttendanceRecord(res.todayRecord);
-      }
-    } catch {
-      // Non-blocking
-    }
-  }, [token]);
-
-  useEffect(() => {
-    if (token) {
-      refreshWorkdayStatus();
-    } else {
-      setTodayAttendanceRecord(null);
-    }
-
-    const handleAttendanceUpdated = (e) => {
-      if (e?.detail) {
-        setTodayAttendanceRecord(e.detail);
-      } else {
-        refreshWorkdayStatus();
-      }
-    };
-    window.addEventListener('hrms:attendance:updated', handleAttendanceUpdated);
-    return () => window.removeEventListener('hrms:attendance:updated', handleAttendanceUpdated);
-  }, [token, refreshWorkdayStatus]);
 
   const login = async (email, password) => {
     const data = await authService.login(email, password);
     setToken(data.token);
     setUser(data.user);
-    localStorage.setItem('hrms_token', data.token);
-    localStorage.setItem('hrms_user', JSON.stringify(data.user));
+    localStorage.setItem('tasknera_ceo_token', data.token);
+    localStorage.setItem('tasknera_ceo_user', JSON.stringify(data.user));
     return data;
   };
 
@@ -104,138 +61,35 @@ export const AuthProvider = ({ children }) => {
     try {
       await authService.logout();
     } catch {
-      // Ignore logout API failures
+      // Ignore API logout error
     } finally {
       setToken(null);
       setUser(null);
-      setTodayAttendanceRecord(null);
-      localStorage.removeItem('hrms_token');
-      localStorage.removeItem('hrms_user');
+      localStorage.removeItem('tasknera_ceo_token');
+      localStorage.removeItem('tasknera_ceo_user');
     }
   };
 
-  const hasPermission = (permission) => {
+  const isCeo = user?.role === 'CEO' || user?.isCeo === true;
+
+  const hasRole = (roles) => {
     if (!user) return false;
-    const userRoleStr = (user.roleName || user.role?.name || user.role || '').toLowerCase().trim();
-    if (['admin', 'superadmin', 'orgadmin'].includes(userRoleStr)) return true;
-    const permissions = (Array.isArray(permission) ? permission : [permission]).map((p) =>
-      (typeof p === 'string' ? p : '').toLowerCase().trim()
+    const targetRoles = (Array.isArray(roles) ? roles : [roles]).map((r) =>
+      r.toLowerCase()
     );
-    const userPerms = Array.isArray(user.permissions)
-      ? user.permissions.map((p) => (typeof p === 'string' ? p : '').toLowerCase().trim())
-      : [];
-    return permissions.some((p) => userPerms.includes(p));
+    return targetRoles.includes((user.role || '').toLowerCase());
   };
-
-  const hasRole = (role) => {
-    if (!user) return false;
-    const userRoleStr = (user.roleName || user.role?.name || user.role || '').toLowerCase().trim();
-    if (['admin', 'superadmin', 'orgadmin'].includes(userRoleStr)) return true;
-    const targetRoles = (Array.isArray(role) ? role : [role]).map((r) =>
-      (typeof r === 'string' ? r : '').toLowerCase().trim()
-    );
-    return targetRoles.includes(userRoleStr);
-  };
-
-  const canManageTraining = () => {
-    if (!user) return false;
-    const userRoleStr = (user.roleName || user.role?.name || user.role || '').toLowerCase().trim();
-    if (['admin', 'superadmin', 'orgadmin'].includes(userRoleStr)) return true;
-
-    // Any role with L&D or Training in title
-    if (
-      userRoleStr.includes('ld') ||
-      userRoleStr.includes('l&d') ||
-      userRoleStr.includes('learning') ||
-      userRoleStr.includes('training') ||
-      userRoleStr.includes('trainer')
-    ) {
-      return true;
-    }
-
-    // Personnel in Learning & Development department
-    const deptStr = (
-      user.departmentName ||
-      user.department?.name ||
-      user.department ||
-      user.departmentCode ||
-      user.deptId ||
-      ''
-    ).toLowerCase().trim();
-
-    return (
-      deptStr === 'learning & development' ||
-      deptStr === 'learning and development' ||
-      deptStr.includes('learning') ||
-      deptStr.includes('l&d') ||
-      deptStr === 'ld' ||
-      deptStr === 'dept-ld'
-    );
-  };
-
-  const updateUser = (updatedFields) => {
-    setUser((prev) => {
-      if (!prev) return prev;
-      const updated = { ...prev, ...updatedFields };
-      try {
-        localStorage.setItem('hrms_user', JSON.stringify(updated));
-      } catch (err) {
-        console.warn('Unable to persist updated user to localStorage (quota or storage error):', err);
-      }
-      return updated;
-    });
-  };
-
-  const userRoleStr = (user?.roleName || user?.role?.name || user?.role || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-  const isAdmin = ['admin', 'superadmin', 'orgadmin'].includes(userRoleStr);
-
-  const userShiftStr = (
-    todayAttendanceRecord?.employee?.shiftTiming ||
-    todayAttendanceRecord?.shiftTiming ||
-    user?.shiftTiming ||
-    ''
-  );
-  const isSplitShift = userShiftStr.includes(',') || userShiftStr.includes(';') || /\band\b|\b&\b/i.test(userShiftStr);
-  const splitSlotsCount = isSplitShift ? userShiftStr.split(/[,;]|\b(?:and|&)\b/i).map((s) => s.trim()).filter(Boolean).length : 1;
-
-  const sessions = Array.isArray(todayAttendanceRecord?.sessions) ? todayAttendanceRecord.sessions : [];
-  const completedSessions = sessions.filter((s) => s.checkIn && s.checkOut);
-
-  // If on a split shift and only the first shift is completed, employee is NOT logged out for the day yet
-  const hasCompletedAllShiftsToday = isSplitShift
-    ? (completedSessions.length >= splitSlotsCount && !todayAttendanceRecord?.checkIn) ||
-      (completedSessions.length >= splitSlotsCount && Boolean(todayAttendanceRecord?.checkOut))
-    : Boolean(todayAttendanceRecord?.checkOut);
-
-  const hasCheckedInToday = Boolean(todayAttendanceRecord?.checkIn);
-  const isActivelyLoggedIn = Boolean(todayAttendanceRecord?.checkIn && !todayAttendanceRecord?.checkOut);
-
-  // When HR, Employee, or Manager logs out for the day (or has not logged in):
-  // isLoggedOutForDay: true if employee has completed all assigned shifts today
-  // isWorkdayActive: true if Admin OR actively checked in and not checked out
-  // canOperate: true if Admin OR actively checked in and not checked out
-  const isLoggedOutForDay = !isAdmin && hasCompletedAllShiftsToday;
-  const isWorkdayActive = isAdmin || isActivelyLoggedIn;
-  const canOperate = isWorkdayActive;
 
   return (
     <AuthContext.Provider
       value={{
         user,
         token,
-        isAuthenticated: !!token && !!user,
         loading,
+        isCeo,
         login,
         logout,
-        hasPermission,
         hasRole,
-        canManageTraining,
-        updateUser,
-        todayAttendanceRecord,
-        isLoggedOutForDay,
-        isWorkdayActive,
-        canOperate,
-        refreshWorkdayStatus,
       }}
     >
       {children}

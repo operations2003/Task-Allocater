@@ -1,83 +1,39 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext.jsx';
 import { ToastProvider } from './context/ToastContext.jsx';
+import { CeoLayout } from './layouts/CeoLayout.jsx';
 import { LoginPage } from './pages/auth/LoginPage.jsx';
-import { AppSumoActivatePage } from './pages/appsumo/AppSumoActivatePage.jsx';
-import { DashboardPage } from './pages/dashboard/DashboardPage.jsx';
-import { AttendanceDashboardPage } from './pages/attendance/AttendanceDashboardPage.jsx';
-import { LeaveManagementPage } from './pages/leaves/LeaveManagementPage.jsx';
-import { OrganizationListPage } from './pages/organizations/OrganizationListPage.jsx';
-import { EmployeeListPage } from './pages/employees/EmployeeListPage.jsx';
-import { UserListPage } from './pages/users/UserListPage.jsx';
-import { DepartmentsPage } from './pages/departments/DepartmentsPage.jsx';
-import { OnboardingDashboardPage } from './pages/onboarding/OnboardingDashboardPage.jsx';
-import { OnboardingDetailPage } from './pages/onboarding/OnboardingDetailPage.jsx';
-import { EmployeeDocumentsPage } from './pages/documents/EmployeeDocumentsPage.jsx';
-import { HelpdeskPage } from './pages/helpdesk/HelpdeskPage.jsx';
-import { EmployeeRequestsPage } from './pages/requests/EmployeeRequestsPage.jsx';
-import { PayrollPage } from './pages/payroll/PayrollPage.jsx';
-import { PoliciesPage } from './pages/policies/PoliciesPage.jsx';
-import { ProfilePage } from './pages/profile/ProfilePage.jsx';
-import { NotificationsPage } from './pages/notifications/NotificationsPage.jsx';
-import { ManagerDashboardPage } from './pages/manager/ManagerDashboardPage.jsx';
-import { TeamManagementPage } from './pages/team/TeamManagementPage.jsx';
-import { PerformancePage } from './pages/performance/PerformancePage.jsx';
-import { ApprovalsPage } from './pages/approvals/ApprovalsPage.jsx';
-import { HROperationsPage } from './pages/hr/HROperationsPage.jsx';
-import { ResignationPage } from './pages/exit/ResignationPage.jsx';
-import { ExitChecklistPage } from './pages/exit/ExitChecklistPage.jsx';
-import { OffboardingPage } from './pages/exit/OffboardingPage.jsx';
-import { FnFSettlementPage } from './pages/exit/FnFSettlementPage.jsx';
-import { TerminationPage } from './pages/exit/TerminationPage.jsx';
-import { AdminSettingsPage } from './pages/admin/AdminSettingsPage.jsx';
-import { RolesPermissionsPage } from './pages/admin/RolesPermissionsPage.jsx';
 import { CeoCommandCentrePage } from './pages/ceo/CeoCommandCentrePage.jsx';
-import { TasksPage } from './pages/tasks/TasksPage.jsx';
-import { TrainingPage } from './pages/training/TrainingPage.jsx';
-import { EngagementPage } from './pages/engagement/EngagementPage.jsx';
-import { ProbationDashboardPage } from './pages/probation/ProbationDashboardPage.jsx';
-import { ReportsPage } from './pages/reports/ReportsPage.jsx';
-import { DateWiseShiftPage } from './pages/shifts/DateWiseShiftPage.jsx';
-import { ForbiddenPage } from './pages/common/ForbiddenPage.jsx';
-import { NotFoundPage } from './pages/common/NotFoundPage.jsx';
-import { AppLayout } from './layouts/AppLayout.jsx';
+import { CeoTaskManagementPage } from './pages/ceo/CeoTaskManagementPage.jsx';
+import { AiTaskAllocationPage } from './pages/ceo/AiTaskAllocationPage.jsx';
+import { PendingTasksPage } from './pages/ceo/PendingTasksPage.jsx';
+import { CeoApprovalPage } from './pages/ceo/CeoApprovalPage.jsx';
+import { EmployeeDirectoryPage } from './pages/employees/EmployeeDirectoryPage.jsx';
+import { EmployeeWorkspacePage } from './pages/tasks/EmployeeWorkspacePage.jsx';
 import { LoadingSpinner } from './components/common/LoadingSpinner.jsx';
 
-/**
- * Route guard for authenticated users
- */
-const ProtectedRoute = ({ children }) => {
-  const { isAuthenticated, loading } = useAuth();
-  const location = useLocation();
+// Protected Route Wrapper
+const ProtectedRoute = ({ children, ceoOnly = false }) => {
+  const { user, isCeo, loading } = useAuth();
 
   if (loading) {
-    return <LoadingSpinner fullPage message="Verifying session..." />;
+    return (
+      <div className="min-h-screen bg-slate-900 flex flex-col justify-center items-center text-white">
+        <LoadingSpinner />
+        <p className="text-xs font-semibold text-slate-400 mt-4 tracking-wide uppercase">
+          Verifying Executive Session...
+        </p>
+      </div>
+    );
   }
 
-  if (!isAuthenticated) {
-    return <Navigate to="/login" state={{ from: location }} replace />;
+  if (!user) {
+    return <Navigate to="/login" replace />;
   }
 
-  return children;
-};
-
-/**
- * Route guard enforcing specific RBAC permissions or roles
- */
-const PermissionRoute = ({ permission, roles, children }) => {
-  const { hasPermission, hasRole, loading } = useAuth();
-
-  if (loading) {
-    return <LoadingSpinner fullPage message="Verifying permissions..." />;
-  }
-
-  if (roles && !hasRole(roles)) {
-    return <Navigate to="/forbidden" replace />;
-  }
-
-  if (permission && !hasPermission(permission)) {
-    return <Navigate to="/forbidden" replace />;
+  if (ceoOnly && !isCeo) {
+    return <Navigate to="/my-tasks" replace />;
   }
 
   return children;
@@ -85,451 +41,66 @@ const PermissionRoute = ({ permission, roles, children }) => {
 
 export const App = () => {
   return (
-    <AuthProvider>
+    <Router>
       <ToastProvider>
-        <BrowserRouter>
+        <AuthProvider>
           <Routes>
-            {/* Public Authentication & Integration Routes */}
+            {/* Public Authentication Route */}
             <Route path="/login" element={<LoginPage />} />
-            <Route path="/appsumo/activate" element={<AppSumoActivatePage />} />
 
-            {/* Authenticated Application Layout */}
+            {/* Protected Standalone CEO Command Centre Layout */}
             <Route
               path="/"
               element={
                 <ProtectedRoute>
-                  <AppLayout />
+                  <CeoLayout />
                 </ProtectedRoute>
               }
             >
               <Route index element={<Navigate to="/dashboard" replace />} />
-              
-              <Route
-                path="dashboard"
-                element={
-                  <PermissionRoute permission="dashboard:read">
-                    <DashboardPage />
-                  </PermissionRoute>
-                }
-              />
-
-              <Route
-                path="attendance"
-                element={
-                  <PermissionRoute permission="attendance:read">
-                    <AttendanceDashboardPage />
-                  </PermissionRoute>
-                }
-              />
-
-              <Route
-                path="leaves"
-                element={
-                  <PermissionRoute permission="leave:read">
-                    <LeaveManagementPage />
-                  </PermissionRoute>
-                }
-              />
-
-              <Route
-                path="leaves/:id"
-                element={
-                  <PermissionRoute permission="leave:read">
-                    <LeaveManagementPage />
-                  </PermissionRoute>
-                }
-              />
-
-              <Route
-                path="organizations"
-                element={
-                  <PermissionRoute permission="org:read">
-                    <OrganizationListPage />
-                  </PermissionRoute>
-                }
-              />
-
-              <Route
-                path="employees"
-                element={
-                  <PermissionRoute permission="employee:read">
-                    <EmployeeListPage />
-                  </PermissionRoute>
-                }
-              />
-
-              <Route
-                path="documents"
-                element={
-                  <PermissionRoute permission={['document:read', 'employee:read']}>
-                    <EmployeeDocumentsPage />
-                  </PermissionRoute>
-                }
-              />
-
-              <Route
-                path="payroll"
-                element={
-                  <PermissionRoute permission="employee:read">
-                    <PayrollPage />
-                  </PermissionRoute>
-                }
-              />
-
-              {/* Monthly Roster & Schedule Calendar (Date-wise Shift Management) */}
-              <Route
-                path="shifts"
-                element={
-                  <PermissionRoute
-                    roles={['HR', 'HRManager', 'Admin', 'SuperAdmin', 'OrgAdmin', 'Manager', 'TeamLead', 'CEO']}
-                  >
-                    <DateWiseShiftPage />
-                  </PermissionRoute>
-                }
-              />
-              <Route
-                path="roster"
-                element={
-                  <PermissionRoute
-                    roles={['HR', 'HRManager', 'Admin', 'SuperAdmin', 'OrgAdmin', 'Manager', 'TeamLead', 'CEO']}
-                  >
-                    <DateWiseShiftPage />
-                  </PermissionRoute>
-                }
-              />
-
-              <Route path="schedule" element={<Navigate to="/roster" replace />} />
-
-              {/* Legacy Roster Sub-Route Redirects */}
-              <Route path="roster/import" element={<Navigate to="/roster" replace />} />
-              <Route path="roster/history" element={<Navigate to="/roster" replace />} />
-              <Route path="roster/preview/:jobId" element={<Navigate to="/roster" replace />} />
-
-              <Route
-                path="policies"
-                element={
-                  <PermissionRoute permission="employee:read">
-                    <PoliciesPage />
-                  </PermissionRoute>
-                }
-              />
-
-              <Route
-                path="profile"
-                element={
-                  <PermissionRoute permission="employee:read">
-                    <ProfilePage />
-                  </PermissionRoute>
-                }
-              />
-
-              <Route
-                path="helpdesk"
-                element={
-                  <PermissionRoute permission={['helpdesk:read', 'request:read', 'employee:read']}>
-                    <HelpdeskPage />
-                  </PermissionRoute>
-                }
-              />
-
-              <Route
-                path="helpdesk/:ticketId"
-                element={
-                  <PermissionRoute permission={['helpdesk:read', 'request:read', 'employee:read']}>
-                    <HelpdeskPage />
-                  </PermissionRoute>
-                }
-              />
-              <Route
-                path="helpdesk/:id"
-                element={
-                  <PermissionRoute permission={['helpdesk:read', 'request:read', 'employee:read']}>
-                    <HelpdeskPage />
-                  </PermissionRoute>
-                }
-              />
-
-              <Route
-                path="requests"
-                element={<Navigate to="/helpdesk?tab=requests" replace />}
-              />
-
-              <Route
-                path="requests/:requestId"
-                element={
-                  <PermissionRoute permission={['helpdesk:read', 'request:read', 'employee:read']}>
-                    <HelpdeskPage />
-                  </PermissionRoute>
-                }
-              />
-
-              <Route
-                path="notifications"
-                element={
-                  <PermissionRoute permission={['notification:read', 'employee:read']}>
-                    <NotificationsPage />
-                  </PermissionRoute>
-                }
-              />
-
-              <Route
-                path="users"
-                element={
-                  <PermissionRoute permission="user:write">
-                    <UserListPage />
-                  </PermissionRoute>
-                }
-              />
-
-              <Route
-                path="onboarding"
-                element={
-                  <PermissionRoute permission="onboarding:read">
-                    <OnboardingDashboardPage />
-                  </PermissionRoute>
-                }
-              />
-
-              <Route
-                path="onboarding/:id"
-                element={
-                  <PermissionRoute permission="onboarding:read">
-                    <OnboardingDetailPage />
-                  </PermissionRoute>
-                }
-              />
-
-              <Route
-                path="departments"
-                element={
-                  <PermissionRoute permission={['dept:read', 'employee:read']}>
-                    <DepartmentsPage />
-                  </PermissionRoute>
-                }
-              />
-
-              {/* Phase 6 Routes */}
-              <Route
-                path="manager"
-                element={
-                  <PermissionRoute roles={['Manager', 'HR', 'HRManager', 'Admin', 'SuperAdmin', 'OrgAdmin']}>
-                    <ManagerDashboardPage />
-                  </PermissionRoute>
-                }
-              />
-
-              <Route
-                path="team"
-                element={
-                  <PermissionRoute roles={['Manager', 'HR', 'HRManager', 'Admin', 'SuperAdmin', 'OrgAdmin']}>
-                    <TeamManagementPage />
-                  </PermissionRoute>
-                }
-              />
-
-              <Route
-                path="performance"
-                element={
-                  <PermissionRoute permission={['performance:read', 'employee:read']}>
-                    <PerformancePage />
-                  </PermissionRoute>
-                }
-              />
-
-              <Route
-                path="performance/:id"
-                element={
-                  <PermissionRoute permission={['performance:read', 'employee:read']}>
-                    <PerformancePage />
-                  </PermissionRoute>
-                }
-              />
-
-              <Route
-                path="approvals"
-                element={
-                  <PermissionRoute roles={['Manager', 'HR', 'HRManager', 'Admin', 'SuperAdmin', 'OrgAdmin']}>
-                    <ApprovalsPage />
-                  </PermissionRoute>
-                }
-              />
-
-              <Route
-                path="hr-operations"
-                element={
-                  <PermissionRoute roles={['HR', 'HRManager', 'Admin', 'SuperAdmin', 'OrgAdmin']}>
-                    <HROperationsPage />
-                  </PermissionRoute>
-                }
-              />
-
-              <Route
-                path="hr"
-                element={<Navigate to="/hr-operations" replace />}
-              />
-
-              {/* Phase 7 Routes */}
-              <Route
-                path="resignation"
-                element={
-                  <PermissionRoute permission={['exit:read', 'exit:write', 'employee:read']}>
-                    <ResignationPage />
-                  </PermissionRoute>
-                }
-              />
-
-              <Route
-                path="exit-checklist"
-                element={
-                  <PermissionRoute permission={['exit:read', 'exit:write', 'employee:read']}>
-                    <ExitChecklistPage />
-                  </PermissionRoute>
-                }
-              />
-
-              <Route
-                path="offboarding"
-                element={
-                  <PermissionRoute permission={['exit:read', 'exit:admin', 'employee:read']}>
-                    <Navigate to="/exit-checklist?tab=offboarding" replace />
-                  </PermissionRoute>
-                }
-              />
-
-              <Route
-                path="fnf"
-                element={
-                  <PermissionRoute permission={['exit:read', 'employee:read']}>
-                    <FnFSettlementPage />
-                  </PermissionRoute>
-                }
-              />
-
-              <Route
-                path="fnf-settlement"
-                element={<Navigate to="/fnf" replace />}
-              />
-
-              <Route
-                path="termination"
-                element={
-                  <PermissionRoute
-                    roles={['HR', 'HRManager', 'Admin', 'SuperAdmin', 'OrgAdmin']}
-                    permission={['exit:admin', 'employee:read']}
-                  >
-                    <TerminationPage />
-                  </PermissionRoute>
-                }
-              />
-
-              {/* Exit Notification Redirects */}
-              <Route
-                path="exit/:id"
-                element={<Navigate to="/offboarding" replace />}
-              />
-              <Route
-                path="exit/:id/fnf"
-                element={<Navigate to="/fnf" replace />}
-              />
-              <Route
-                path="exit/clearances/:taskId"
-                element={<Navigate to="/exit-checklist" replace />}
-              />
-
-              <Route
-                path="admin-settings"
-                element={
-                  <PermissionRoute roles={['Admin', 'SuperAdmin', 'OrgAdmin']}>
-                    <AdminSettingsPage />
-                  </PermissionRoute>
-                }
-              />
-
-              <Route
-                path="roles"
-                element={
-                  <PermissionRoute roles={['Admin', 'SuperAdmin', 'OrgAdmin']}>
-                    <RolesPermissionsPage />
-                  </PermissionRoute>
-                }
-              />
-
-              {/* TaskNera CEO Command Centre (Executive Authority & AI Allocations) */}
-              <Route
-                path="ceo/command-centre"
-                element={
-                  <PermissionRoute roles={['Admin', 'SuperAdmin', 'OrgAdmin', 'CEO']}>
-                    <CeoCommandCentrePage />
-                  </PermissionRoute>
-                }
-              />
-              <Route path="ceo" element={<Navigate to="/ceo/command-centre" replace />} />
-              <Route path="ceo-dashboard" element={<Navigate to="/ceo/command-centre" replace />} />
-
-              {/* Tasks & Work Management */}
+              <Route path="dashboard" element={<CeoCommandCentrePage />} />
               <Route
                 path="tasks"
                 element={
-                  <PermissionRoute permission={['task:read', 'employee:read']}>
-                    <TasksPage />
-                  </PermissionRoute>
+                  <ProtectedRoute ceoOnly>
+                    <CeoTaskManagementPage />
+                  </ProtectedRoute>
                 }
               />
-
-
-              {/* Learning & Skill Development */}
               <Route
-                path="training"
+                path="ai-allocation"
                 element={
-                  <PermissionRoute permission={['training:read', 'employee:read']}>
-                    <TrainingPage />
-                  </PermissionRoute>
+                  <ProtectedRoute ceoOnly>
+                    <AiTaskAllocationPage />
+                  </ProtectedRoute>
                 }
               />
-
-              {/* Employee Engagement & Communication */}
               <Route
-                path="engagement"
+                path="pending-tasks"
                 element={
-                  <PermissionRoute roles={['HR', 'HRManager', 'Admin', 'SuperAdmin', 'OrgAdmin']}>
-                    <EngagementPage />
-                  </PermissionRoute>
+                  <ProtectedRoute ceoOnly>
+                    <PendingTasksPage />
+                  </ProtectedRoute>
                 }
               />
-
-              {/* Probation & Confirmation */}
               <Route
-                path="probation"
+                path="approvals"
                 element={
-                  <PermissionRoute roles={['Manager', 'HR', 'HRManager', 'Admin', 'SuperAdmin', 'OrgAdmin']}>
-                    <ProbationDashboardPage />
-                  </PermissionRoute>
+                  <ProtectedRoute ceoOnly>
+                    <CeoApprovalPage />
+                  </ProtectedRoute>
                 }
               />
-
-              {/* HR Analytics & Workforce Intelligence (Merged with HR Operations) */}
-              <Route
-                path="analytics"
-                element={<Navigate to="/hr-operations?tab=analytics" replace />}
-              />
-
-              {/* Department Performance Review Reports */}
-              <Route
-                path="reports"
-                element={
-                  <PermissionRoute permission={['employee:read']}>
-                    <ReportsPage />
-                  </PermissionRoute>
-                }
-              />
-
-              <Route path="forbidden" element={<ForbiddenPage />} />
-              <Route path="*" element={<NotFoundPage />} />
+              <Route path="employees" element={<EmployeeDirectoryPage />} />
+              <Route path="my-tasks" element={<EmployeeWorkspacePage />} />
             </Route>
+
+            {/* Fallback */}
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
-        </BrowserRouter>
+        </AuthProvider>
       </ToastProvider>
-    </AuthProvider>
+    </Router>
   );
 };
 

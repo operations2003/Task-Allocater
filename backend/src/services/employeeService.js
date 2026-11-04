@@ -1,757 +1,192 @@
-import { employeeRepository } from '../repositories/employeeRepository.js';
-import { orgRepository } from '../repositories/orgRepository.js';
-import { userRepository } from '../repositories/userRepository.js';
-import { roleRepository } from '../repositories/roleRepository.js';
-import { designationRepository } from '../repositories/designationRepository.js';
-import { leaveRepository } from '../repositories/leaveRepository.js';
-import { exitChecklistRepository } from '../repositories/exitChecklistRepository.js';
-import { exitRepository } from '../repositories/exitRepository.js';
-import { notificationRepository } from '../repositories/notificationRepository.js';
-import { hashPassword } from '../utils/passwordUtils.js';
-import { appsumoService } from './appsumoService.js';
-import { pool } from '../config/db.js';
-import { logger } from '../utils/logger.js';
+import { query } from '../config/db.js';
+import { nanoid } from 'nanoid';
+import { getCeoAdminExclusionSql } from '../utils/roleUtils.js';
 
 /**
- * Handle PostgreSQL specific error codes for Employee domain
+ * Independent Employee Directory Service for TaskNera CEO Command Centre
  */
-const handlePostgresError = (err, data = {}) => {
-  if (err.code === '23503') {
-    // Foreign key violation
-    let message = 'Invalid relational reference provided.';
-    if (err.constraint === 'employees_org_id_fkey') {
-      message = `Organization with ID '${data.orgId}' does not exist.`;
-    } else if (err.constraint === 'employees_dept_id_fkey') {
-      message = `Department with ID '${data.deptId}' does not exist.`;
-    } else if (err.constraint === 'employees_desig_id_fkey') {
-      message = `Designation with ID '${data.desigId}' does not exist.`;
-    } else if (err.constraint === 'employees_user_id_fkey') {
-      message = `User account with ID '${data.userId}' does not exist.`;
-    }
-    const error = new Error(message);
-    error.statusCode = 400;
-    return error;
-  }
-
-  if (err.code === '23505') {
-    // Unique constraint violation
-    let message = 'A unique constraint violation occurred.';
-    if (err.constraint === 'uk_org_employee_code') {
-      message = `Employee code '${data.employeeCode}' already exists in this organization.`;
-    } else if (err.constraint === 'uk_org_employee_email') {
-      message = `An employee with email '${data.email}' already exists in this organization.`;
-    } else if (err.constraint === 'employees_user_id_key') {
-      message = 'The specified user account is already linked to another employee.';
-    }
-    const error = new Error(message);
-    error.statusCode = 409;
-    return error;
-  }
-
-  if (err.code === '22007') {
-    const error = new Error('Invalid date format or date value is out of range.');
-    error.statusCode = 400;
-    return error;
-  }
-
-  if (err.code === '22001') {
-    const error = new Error('One or more text fields exceed the maximum allowed character length.');
-    error.statusCode = 400;
-    return error;
-  }
-
-  if (err.code === '22003') {
-    const error = new Error('Numeric value is out of allowable range.');
-    error.statusCode = 400;
-    return error;
-  }
-
-  return err;
-};
-
 export const employeeService = {
-  async listEmployees(query) {
-    return await employeeRepository.findAll(query);
-  },
+  /**
+   * List all employees in the directory
+   */
+  async listEmployees(orgId, filters = {}) {
+    let sql = `
+      SELECT e.*,
+             d.name AS dept_name, d.code AS dept_code,
+             ds.title AS desig_title, ds.code AS desig_code,
+             u.role AS user_role, u.is_active AS user_active,
+             COALESCE((
+               SELECT COUNT(*) FROM work_tasks t 
+               WHERE t.assignee_id = e.id AND t.status IN ('TODO', 'IN_PROGRESS', 'BLOCKED')
+             ), 0) AS active_tasks_count
+      FROM employees e
+      LEFT JOIN departments d ON e.dept_id = d.id
+      LEFT JOIN designations ds ON e.desig_id = ds.id
+      LEFT JOIN users u ON e.user_id = u.id
+      WHERE e.org_id = $1
+    `;
+    const params = [orgId];
 
-  async getEmployeeById(id) {
-    const employee = await employeeRepository.findById(id);
-    if (!employee) {
-      const error = new Error(`Employee with ID '${id}' not found.`);
-      error.statusCode = 404;
-      throw error;
+    if (filters.excludeCeo) {
+      sql += ` AND ${getCeoAdminExclusionSql('e')}`;
     }
-    return employee;
-  },
-
-  async createEmployee(data) {
-    // 1. Validate organization exists
-    const org = await orgRepository.findById(data.orgId);
-    if (!org) {
-      const error = new Error(`Organization with ID '${data.orgId}' does not exist.`);
-      error.statusCode = 400;
-      throw error;
+    if (filters.deptId) {
+      params.push(filters.deptId);
+      sql += ` AND e.dept_id = $${params.length}`;
     }
-
-    // 1b. Enforce AppSumo Tier Quota if organization has an AppSumo entitlement
-    const entitlement = await appsumoService.getOrganizationEntitlement(data.orgId);
-    if (entitlement && entitlement.hasAppSumo) {
-      if (!entitlement.isEntitled) {
-        const error = new Error(
-          `Cannot add employee: Your organization's AppSumo license is currently ${entitlement.status}. Please reactivate your license to continue.`
-        );
-        error.statusCode = 403;
-        throw error;
-      }
-
-      if (entitlement.maxEmployees && entitlement.maxEmployees < Infinity) {
-        const currentEmployees = await employeeRepository.findAll({ orgId: data.orgId });
-        const currentCount = currentEmployees.pagination?.total ?? (currentEmployees.employees?.length || 0);
-        if (currentCount >= entitlement.maxEmployees) {
-          const error = new Error(
-            `Employee limit reached (${currentCount}/${entitlement.maxEmployees}) for your AppSumo tier (${entitlement.planName}). Please upgrade your tier in AppSumo to add more employees.`
-          );
-          error.statusCode = 403;
-          throw error;
-        }
-      }
+    if (filters.availability) {
+      params.push(filters.availability.toUpperCase());
+      sql += ` AND e.availability_status = $${params.length}`;
+    }
+    if (filters.search) {
+      params.push(`%${filters.search.toLowerCase()}%`);
+      sql += ` AND (
+        LOWER(e.first_name || ' ' || e.last_name) LIKE $${params.length}
+        OR LOWER(e.email) LIKE $${params.length}
+        OR LOWER(e.employee_code) LIKE $${params.length}
+        OR LOWER(COALESCE(d.name, '')) LIKE $${params.length}
+        OR LOWER(COALESCE(ds.title, '')) LIKE $${params.length}
+      )`;
     }
 
-    // 2. Pre-check duplicate email
-    const existingEmail = await employeeRepository.findByEmail(data.email, data.orgId);
-    if (existingEmail) {
-      const error = new Error(`An employee with email '${data.email}' already exists.`);
-      error.statusCode = 409;
-      throw error;
-    }
+    sql += ` ORDER BY e.current_workload ASC, e.first_name ASC;`;
 
-    // 3. Pre-check duplicate employeeCode if provided
-    if (data.employeeCode) {
-      const existingCode = await employeeRepository.findByCode(data.employeeCode, data.orgId);
-      if (existingCode) {
-        const error = new Error(`Employee code '${data.employeeCode}' already exists.`);
-        error.statusCode = 409;
-        throw error;
-      }
-    }
-
-    // 4. Handle portal user account and password credentials if provided
-    let userId = data.userId || null;
-    if (data.password) {
-      // Resolve role
-      let role = null;
-      if (data.roleId) {
-        role = (await roleRepository.findRoleById(data.roleId)) || (await roleRepository.findRoleByName(data.roleId));
-      }
-      if (!role) {
-        role = (await roleRepository.findRoleByName('Employee')) || (await roleRepository.findRoleByName('EMPLOYEE'));
-      }
-      if (!role) {
-        const allRoles = await roleRepository.findAllRoles();
-        role = allRoles.find((r) => r.name.toLowerCase() === 'employee') || allRoles[0];
-      }
-
-      const passwordHash = await hashPassword(data.password);
-
-      // Check if user account with this email already exists
-      const existingUser = await userRepository.findByEmail(data.email);
-      if (existingUser) {
-        // Check if already linked to another employee
-        const empCheck = await pool.query(
-          'SELECT id, first_name, last_name FROM employees WHERE user_id = $1 LIMIT 1;',
-          [existingUser.id]
-        );
-        if (empCheck.rows.length > 0) {
-          const linkedEmp = empCheck.rows[0];
-          const error = new Error(
-            `A user account with email '${data.email}' is already linked to employee '${linkedEmp.first_name} ${linkedEmp.last_name}'.`
-          );
-          error.statusCode = 409;
-          throw error;
-        }
-
-        // Update user account credentials & active status
-        await userRepository.update(existingUser.id, {
-          passwordHash,
-          status: data.status || 'Active',
-          roleId: role ? role.id : existingUser.roleId,
-          firstName: data.firstName,
-          lastName: data.lastName,
-          orgId: data.orgId,
-        });
-        userId = existingUser.id;
-      } else {
-        // Create new user login account
-        const newUser = await userRepository.create({
-          orgId: data.orgId,
-          roleId: role ? role.id : 'role-employee',
-          email: data.email,
-          passwordHash,
-          firstName: data.firstName,
-          lastName: data.lastName,
-          status: data.status || 'Active',
-        });
-        userId = newUser.id;
-      }
-    }
-
-    // Enforce: Admin role has department 'Main' and is designated as CEO
-    let assignedRole = null;
-    if (data.roleId) {
-      assignedRole = (await roleRepository.findRoleById(data.roleId)) || (await roleRepository.findRoleByName(data.roleId));
-    }
-    const isAdminRole =
-      (assignedRole && (assignedRole.name.toLowerCase() === 'admin' || assignedRole.name.toLowerCase() === 'superadmin')) ||
-      data.email === 'sheetalbedi@tasknera.com';
-    if (isAdminRole) {
-      const mainDeptRes = await pool.query(
-        "SELECT id FROM departments WHERE (LOWER(name) = 'main' OR code = 'MAIN') AND org_id = $1 LIMIT 1;",
-        [data.orgId || 'org-1']
-      );
-      data.deptId = mainDeptRes.rows[0]?.id || 'dept-main';
-      const ceoDesig =
-        (await designationRepository.findByCode('CEO', data.orgId)) ||
-        (await designationRepository.findById('desig-ceo', data.orgId));
-      if (ceoDesig) data.desigId = ceoDesig.id;
-    }
-
-    try {
-      const newEmployee = await employeeRepository.create({
-        ...data,
-        userId,
-      });
-
-      // Initialize or set custom leave balances decided by Admin
-      if (data.leaveAllocations) {
-        await leaveRepository.setEmployeeLeaveAllocations(
-          newEmployee.id,
-          newEmployee.orgId,
-          new Date().getFullYear(),
-          data.leaveAllocations
-        );
-      } else {
-        await leaveRepository.initializeBalancesForEmployee(
-          newEmployee.id,
-          newEmployee.orgId,
-          new Date().getFullYear(),
-          newEmployee.gender
-        );
-      }
-
-      return newEmployee;
-    } catch (err) {
-      throw handlePostgresError(err, data);
-    }
-  },
-
-  async updateEmployee(id, data, currentUser = null) {
-    const existing = await employeeRepository.findById(id);
-    if (!existing) {
-      const error = new Error(`Employee with ID '${id}' not found.`);
-      error.statusCode = 404;
-      throw error;
-    }
-
-    // HR cannot update her own shift timing (Admin retains full permission)
-    if (currentUser) {
-      const normRole = (currentUser.roleName || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-      const isHr = ['hr', 'hrmanager'].includes(normRole);
-      const isAdmin = ['admin', 'superadmin', 'orgadmin'].includes(normRole);
-
-      if (isHr && !isAdmin) {
-        const isSelf =
-          (currentUser.employeeId && (existing.id === currentUser.employeeId || id === currentUser.employeeId)) ||
-          (currentUser.id && (existing.userId === currentUser.id || existing.id === currentUser.id || id === currentUser.id)) ||
-          (currentUser.email && existing.email && currentUser.email.toLowerCase() === existing.email.toLowerCase());
-
-        if (isSelf && data.shiftTiming !== undefined) {
-          const existingShift = (existing.shiftTiming || '11:00 AM - 07:00 PM').trim();
-          const newShift = (data.shiftTiming || '').trim();
-          if (newShift && newShift !== existingShift) {
-            const error = new Error('Access denied: HR is not authorized to modify her own shift timing. Please contact an Administrator.');
-            error.statusCode = 403;
-            throw error;
-          }
-          delete data.shiftTiming;
-        }
-      }
-    }
-
-    const orgId = data.orgId || existing.orgId;
-
-    if (data.email && data.email.toLowerCase() !== existing.email.toLowerCase()) {
-      const emailTaken = await employeeRepository.findByEmail(data.email, orgId);
-      if (emailTaken && emailTaken.id !== id) {
-        const error = new Error(`Email '${data.email}' is already in use by another employee.`);
-        error.statusCode = 409;
-        throw error;
-      }
-    }
-
-    if (data.employeeCode && data.employeeCode.toUpperCase() !== existing.employeeCode.toUpperCase()) {
-      const codeTaken = await employeeRepository.findByCode(data.employeeCode, orgId);
-      if (codeTaken && codeTaken.id !== id) {
-        const error = new Error(`Employee code '${data.employeeCode}' is already in use.`);
-        error.statusCode = 409;
-        throw error;
-      }
-    }
-
-    // Handle password update and linked user synchronization
-    let userId = existing.userId;
-    if (data.password) {
-      const passwordHash = await hashPassword(data.password);
-      let user = null;
-      if (userId) {
-        user = await userRepository.findById(userId);
-      }
-      if (!user) {
-        user = await userRepository.findByEmail(data.email || existing.email);
-      }
-
-      if (user) {
-        await userRepository.update(user.id, {
-          passwordHash,
-          email: data.email || user.email,
-          firstName: data.firstName || user.firstName,
-          lastName: data.lastName || user.lastName,
-          status: data.status || user.status,
-          ...(data.roleId ? { roleId: data.roleId } : {}),
-        });
-        userId = user.id;
-      } else {
-        let role = null;
-        if (data.roleId) {
-          role = (await roleRepository.findRoleById(data.roleId)) || (await roleRepository.findRoleByName(data.roleId));
-        }
-        if (!role) {
-          role = (await roleRepository.findRoleByName('Employee')) || (await roleRepository.findRoleByName('EMPLOYEE'));
-        }
-        const newUser = await userRepository.create({
-          orgId,
-          roleId: role ? role.id : 'role-employee',
-          email: data.email || existing.email,
-          passwordHash,
-          firstName: data.firstName || existing.firstName,
-          lastName: data.lastName || existing.lastName,
-          status: data.status || existing.status || 'Active',
-        });
-        userId = newUser.id;
-      }
-    } else if (userId && (data.email || data.firstName || data.lastName || data.status || data.roleId || data.avatarUrl !== undefined)) {
-      // Sync basic profile updates to user account if linked
-      await userRepository.update(userId, {
-        ...(data.email ? { email: data.email } : {}),
-        ...(data.firstName ? { firstName: data.firstName } : {}),
-        ...(data.lastName ? { lastName: data.lastName } : {}),
-        ...(data.status ? { status: data.status } : {}),
-        ...(data.roleId ? { roleId: data.roleId } : {}),
-        ...(data.avatarUrl !== undefined ? { avatarUrl: data.avatarUrl } : {}),
-      });
-    }
-
-    // Enforce: Admin role has department 'Main' and is designated as CEO
-    let checkRole = null;
-    if (data.roleId) {
-      checkRole = (await roleRepository.findRoleById(data.roleId)) || (await roleRepository.findRoleByName(data.roleId));
-    } else if (existing.user?.roleId) {
-      checkRole = await roleRepository.findRoleById(existing.user.roleId);
-    }
-    const isEmpAdmin =
-      (checkRole && (checkRole.name.toLowerCase() === 'admin' || checkRole.name.toLowerCase() === 'superadmin')) ||
-      (existing.user?.roleName || '').toLowerCase() === 'admin' ||
-      existing.email === 'sheetalbedi@tasknera.com' ||
-      data.email === 'sheetalbedi@tasknera.com';
-    if (isEmpAdmin) {
-      const mainDeptRes = await pool.query(
-        "SELECT id FROM departments WHERE (LOWER(name) = 'main' OR code = 'MAIN') AND org_id = $1 LIMIT 1;",
-        [orgId || 'org-1']
-      );
-      data.deptId = mainDeptRes.rows[0]?.id || 'dept-main';
-      const ceoDesig =
-        (await designationRepository.findByCode('CEO', orgId)) ||
-        (await designationRepository.findById('desig-ceo', orgId));
-      if (ceoDesig) data.desigId = ceoDesig.id;
-    }
-
-    try {
-      const updated = await employeeRepository.update(id, {
-        ...data,
-        userId,
-      });
-
-      if (data.leaveAllocations) {
-        await leaveRepository.setEmployeeLeaveAllocations(
-          id,
-          orgId,
-          new Date().getFullYear(),
-          data.leaveAllocations
-        );
-      }
-
-      // AUTO-PROVISION EXIT CHECKLIST:
-      // If employee's internship or employment status is updated to completed/exited/notice/resigned/terminated/inactive
-      // in Employee Directory, directly reflect in Exit Checklist without requiring manual initiation.
-      const statusLower = String(data.status || updated?.status || '').trim().toLowerCase();
-      const internshipStatusUpper = String(data.internshipStatus || updated?.internshipStatus || '').trim().toUpperCase();
-      const empTypeLower = String(data.employmentType || updated?.employmentType || existing?.employmentType || '').trim().toLowerCase();
-
-      const isExitStatus = ['exited', 'completed', 'terminated', 'notice period', 'resigned', 'inactive'].includes(statusLower);
-      const isInternshipDone =
-        internshipStatusUpper === 'COMPLETED' ||
-        internshipStatusUpper === 'ENDED' ||
-        (empTypeLower.includes('intern') && (statusLower === 'completed' || statusLower === 'exited'));
-
-      if (isExitStatus || isInternshipDone) {
-        try {
-          const autoChecklist = await this.ensureExitChecklistForEmployee(
-            updated || existing,
-            {
-              status: data.status || updated?.status || existing?.status,
-              internshipStatus: data.internshipStatus || updated?.internshipStatus,
-              resignationDate: data.resignationDate || data.internshipEndDate || updated?.internshipEndDate,
-              lastWorkingDay: data.lastWorkingDay || data.internshipEndDate || updated?.internshipEndDate,
-              notes:
-                data.notes ||
-                (isInternshipDone
-                  ? `Internship concluded for ${updated.firstName} ${updated.lastName || ''} in Employee Directory.`
-                  : `Status updated to '${data.status || updated.status}' in Employee Directory.`),
-            },
-            currentUser
-          );
-          if (autoChecklist) {
-            updated.exitChecklist = autoChecklist;
-          }
-        } catch (autoErr) {
-          logger.warn('EMPLOYEE_UPDATE_EXIT_AUTO', `Could not auto-provision exit checklist: ${autoErr.message}`);
-        }
-      }
-
-      return updated;
-    } catch (err) {
-      throw handlePostgresError(err, { ...existing, ...data });
-    }
-  },
-
-  async deleteEmployee(id) {
-    const existing = await employeeRepository.findById(id);
-    if (!existing) {
-      const error = new Error(`Employee with ID '${id}' not found.`);
-      error.statusCode = 404;
-      throw error;
-    }
-
-    // Clean up dependent leave balances
-    await pool.query('DELETE FROM leave_balances WHERE employee_id = $1;', [id]);
-
-    return await employeeRepository.delete(id);
-  },
-
-  async getMetadata() {
-    return await employeeRepository.getMetadata();
+    const res = await query(sql, params);
+    return res.rows;
   },
 
   /**
-   * Deprovision and mark employee profile as Exited (with associated user deactivation and auto-exit checklist)
+   * Get employee by ID
    */
-  async deactivateEmployee(id, reason = 'Employee marked as exited', currentUser = null) {
-    const existing = await employeeRepository.findById(id);
-    if (!existing) {
-      const error = new Error(`Employee with ID '${id}' not found.`);
-      error.statusCode = 404;
-      throw error;
-    }
-
-    // Mark employee as Exited
-    const updatedEmp = await employeeRepository.update(id, { status: 'Exited' });
-
-    // Mark associated portal user account as Inactive
-    if (existing.userId) {
-      await userRepository.update(existing.userId, { status: 'Inactive' });
-    }
-
-    // Auto-provision Exit Checklist for the deactivated / exited employee
-    try {
-      await this.ensureExitChecklistForEmployee(
-        updatedEmp || existing,
-        {
-          status: 'Exited',
-          notes: reason || `Employee deactivated and marked as Exited in Employee Directory`,
-        },
-        currentUser
-      );
-    } catch (autoErr) {
-      logger.warn('DEACTIVATE_EMPLOYEE_EXIT_AUTO', `Could not auto-provision exit checklist: ${autoErr.message}`);
-    }
-
-    return updatedEmp;
+  async getEmployeeById(id, orgId) {
+    const sql = `
+      SELECT e.*,
+             d.name AS dept_name, d.code AS dept_code,
+             ds.title AS desig_title, ds.code AS desig_code,
+             u.role AS user_role
+      FROM employees e
+      LEFT JOIN departments d ON e.dept_id = d.id
+      LEFT JOIN designations ds ON e.desig_id = ds.id
+      LEFT JOIN users u ON e.user_id = u.id
+      WHERE e.id = $1 AND e.org_id = $2
+      LIMIT 1;
+    `;
+    const res = await query(sql, [id, orgId]);
+    return res.rows[0] || null;
   },
 
   /**
-   * Automatically ensure an employee has an Exit Checklist and Clearance records
-   * whenever internship or employment ends or status changes in Employee Directory.
+   * Create employee profile
    */
-  async ensureExitChecklistForEmployee(employee, options = {}, currentUser = null) {
-    if (!employee || !employee.id) return null;
-    const orgId = employee.orgId || 'org-1';
+  async createEmployee(orgId, payload) {
+    const id = `emp-${nanoid(10)}`;
+    const code = payload.employeeCode || `TN-${nanoid(6).toUpperCase()}`;
 
-    // 1. Format dates (fallback to today if none provided)
-    const todayStr = new Date().toISOString().split('T')[0];
-    const resignationDate = options.resignationDate
-      ? (typeof options.resignationDate === 'string' ? options.resignationDate.slice(0, 10) : todayStr)
-      : todayStr;
-    const lastWorkingDay = options.lastWorkingDay
-      ? (typeof options.lastWorkingDay === 'string' ? options.lastWorkingDay.slice(0, 10) : resignationDate)
-      : resignationDate;
-
-    // Check if currentUser is a valid foreign key in users
-    let validUserId = null;
-    if (currentUser?.id) {
-      const uCheck = await pool.query('SELECT id FROM users WHERE id = $1 LIMIT 1;', [currentUser.id]);
-      if (uCheck.rows.length > 0) validUserId = uCheck.rows[0].id;
-    }
-
-    // 2. Check if active checklist already exists
-    let exitChecklist = await exitChecklistRepository.findActiveByEmployeeId(employee.id, orgId);
-    if (!exitChecklist) {
-      exitChecklist = await exitChecklistRepository.create({
-        orgId,
-        employeeId: employee.id,
-        resignationDate,
-        lastWorkingDay,
-        createdBy: validUserId,
-        notes: options.notes || `Auto-provisioned from Employee Directory (${options.status || employee.status || 'Exit'})`,
-      });
-      logger.info(
-        'AUTO_EXIT_CHECKLIST',
-        `Exit checklist ${exitChecklist.id} auto-created for employee ${employee.id} (${employee.firstName} ${employee.lastName || ''})`
-      );
-    }
-
-    // 3. Ensure Exit Request and Offboarding records exist so all exit tabs are populated
-    try {
-      const existingExitReq = await exitRepository.findByEmployeeId(employee.id, orgId);
-      if (!existingExitReq) {
-        const isInternship =
-          String(options.internshipStatus || employee.internshipStatus || '').toUpperCase() === 'COMPLETED' ||
-          String(employee.employmentType || '').toLowerCase().includes('intern');
-        const exitReq = await exitRepository.create({
-          orgId,
-          employeeId: employee.id,
-          resignationDate,
-          noticePeriodDays: 0,
-          requestedLastWorkingDay: lastWorkingDay,
-          approvedLastWorkingDay: lastWorkingDay,
-          exitType: isInternship ? 'CONTRACT_END' : (options.status === 'Terminated' ? 'INVOLUNTARY' : 'VOLUNTARY'),
-          reason: options.notes || `[AUTO_EXIT] Direct workflow transition from Employee Directory.`,
-          comments: options.notes || `Auto-created exit request for ${employee.firstName} ${employee.lastName || ''}`,
-          status: 'EXIT_PROCESSING',
-          currentStage: 'CLEARANCE_IN_PROGRESS',
-          submittedBy: validUserId,
-        });
-
-        await exitRepository.upsertOffboarding({
-          orgId,
-          exitRequestId: exitReq.id,
-          employeeId: employee.id,
-          lastWorkingDay,
-          offboardingStatus: 'CLEARANCES_PENDING',
-          clearanceStatus: 'PENDING',
-          accessRemovalStatus: 'ACTIVE',
-          assetStatus: 'PENDING',
-          hrCompletionStatus: 'IN_PROGRESS',
-          processedBy: validUserId,
-          notes: options.notes || `Direct clearance pipeline for ${employee.firstName} ${employee.lastName || ''}`,
-        });
-
-        const defaultTasks = [
-          {
-            orgId,
-            exitRequestId: exitReq.id,
-            employeeId: employee.id,
-            checklistCategory: 'ASSETS_RETURNED',
-            departmentScope: 'IT',
-            taskTitle: 'Hardware, Laptop & Asset Handover',
-            description: 'Physical inspection and recovery of company issued hardware, access card, and accessories.',
-          },
-          {
-            orgId,
-            exitRequestId: exitReq.id,
-            employeeId: employee.id,
-            checklistCategory: 'KT_COMPLETED',
-            departmentScope: 'DEPARTMENT',
-            taskTitle: 'Project Knowledge Transfer & Repository Handover',
-            description: 'Handover of project documentation, work artifacts, credentials, and codebases.',
-          },
-          {
-            orgId,
-            exitRequestId: exitReq.id,
-            employeeId: employee.id,
-            checklistCategory: 'SYSTEM_ACCESS_REVOKED',
-            departmentScope: 'IT',
-            taskTitle: 'Revoke Email, Slack & Portal System Access',
-            description: 'De-provisioning email, repository access, and internal communications.',
-          },
-          {
-            orgId,
-            exitRequestId: exitReq.id,
-            employeeId: employee.id,
-            checklistCategory: 'FNF_SETTLEMENT',
-            departmentScope: 'FINANCE',
-            taskTitle: 'Final Stipend / Salary Settlement & Experience Release',
-            description: 'Settlement of final dues and release of formal Completion / Experience Certificate.',
-          },
-        ];
-
-        await exitRepository.createClearanceBatch(defaultTasks).catch(() => {});
-      }
-    } catch (offboardingErr) {
-      logger.warn('AUTO_EXIT_OFFBOARDING', `Non-blocking offboarding setup error: ${offboardingErr.message}`);
-    }
-
-    return exitChecklist;
+    const sql = `
+      INSERT INTO employees (
+        id, org_id, employee_code, first_name, last_name, email,
+        phone, dept_id, desig_id, manager_id, skills,
+        current_workload, availability_status, is_active, created_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, true, NOW())
+      RETURNING *;
+    `;
+    const res = await query(sql, [
+      id,
+      orgId,
+      code,
+      payload.firstName,
+      payload.lastName,
+      payload.email,
+      payload.phone || null,
+      payload.deptId || null,
+      payload.desigId || null,
+      payload.managerId || null,
+      payload.skills || [],
+      payload.currentWorkload || 0,
+      payload.availabilityStatus || 'AVAILABLE',
+    ]);
+    return res.rows[0];
   },
 
   /**
-   * Officially end an intern's internship (HR / Admin action)
-   * Validates intern record, enforces authorization, records end date,
-   * updates status to 'Completed', and preserves all historical data.
+   * Update employee profile
    */
-  async endInternship(id, currentUser, options = {}) {
-    // 1. Authorization: Only authorized HR or Admin users
-    const allRoles = (Array.isArray(currentUser?.roles) ? currentUser.roles : [currentUser?.roleName || currentUser?.role || ''])
-      .filter(Boolean)
-      .map((r) => String(r).toLowerCase().replace(/[^a-z0-9]/g, ''));
-    const isHrOrAdmin =
-      allRoles.some((r) => ['admin', 'superadmin', 'orgadmin', 'hr', 'hrmanager'].includes(r)) ||
-      (currentUser?.email || '').toLowerCase() === 'sheetalbedi@tasknera.com';
+  async updateEmployee(id, orgId, payload) {
+    const fields = [];
+    const params = [id, orgId];
 
-    if (!isHrOrAdmin) {
-      const error = new Error('Access denied: Only authorized HR or Admin users can end an internship.');
-      error.statusCode = 403;
-      throw error;
+    if (payload.firstName !== undefined) {
+      params.push(payload.firstName);
+      fields.push(`first_name = $${params.length}`);
+    }
+    if (payload.lastName !== undefined) {
+      params.push(payload.lastName);
+      fields.push(`last_name = $${params.length}`);
+    }
+    if (payload.email !== undefined) {
+      params.push(payload.email);
+      fields.push(`email = $${params.length}`);
+    }
+    if (payload.phone !== undefined) {
+      params.push(payload.phone);
+      fields.push(`phone = $${params.length}`);
+    }
+    if (payload.deptId !== undefined) {
+      params.push(payload.deptId);
+      fields.push(`dept_id = $${params.length}`);
+    }
+    if (payload.desigId !== undefined) {
+      params.push(payload.desigId);
+      fields.push(`desig_id = $${params.length}`);
+    }
+    if (payload.skills !== undefined) {
+      params.push(payload.skills);
+      fields.push(`skills = $${params.length}`);
+    }
+    if (payload.currentWorkload !== undefined) {
+      params.push(payload.currentWorkload);
+      fields.push(`current_workload = $${params.length}`);
+    }
+    if (payload.availabilityStatus !== undefined) {
+      params.push(payload.availabilityStatus);
+      fields.push(`availability_status = $${params.length}`);
+    }
+    if (payload.isActive !== undefined) {
+      params.push(payload.isActive);
+      fields.push(`is_active = $${params.length}`);
     }
 
-    // 2. Fetch employee
-    const employee = await employeeRepository.findById(id);
-    if (!employee) {
-      const error = new Error(`Employee with ID '${id}' not found.`);
-      error.statusCode = 404;
-      throw error;
+    if (fields.length === 0) {
+      return this.getEmployeeById(id, orgId);
     }
 
-    // 3. Organization boundary check
-    const normRole = (currentUser?.roleName || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-    if (currentUser?.orgId && employee.orgId !== currentUser.orgId && !normRole.includes('superadmin')) {
-      const error = new Error('Access denied: Employee not found in your organization.');
-      error.statusCode = 404;
-      throw error;
-    }
+    fields.push(`updated_at = NOW()`);
 
-    // 4. Validate that the employee is an intern
-    const empType = String(employee.employmentType || '').trim().toLowerCase();
-    const desigTitle = String(employee.designation?.title || '').trim().toLowerCase();
-    const isIntern = empType === 'intern' || empType === 'internship' || desigTitle.includes('intern');
-    if (!isIntern) {
-      const error = new Error(`Employee '${employee.firstName} ${employee.lastName}' is not registered as an intern.`);
-      error.statusCode = 400;
-      throw error;
-    }
+    const sql = `
+      UPDATE employees
+      SET ${fields.join(', ')}
+      WHERE id = $1 AND org_id = $2
+      RETURNING *;
+    `;
+    const res = await query(sql, params);
+    return res.rows[0];
+  },
 
-    // 5. Prevent repeated ending if already completed/ended
-    const intStatus = String(employee.internshipStatus || '').trim().toUpperCase();
-    const empStatus = String(employee.status || '').trim().toLowerCase();
-    if (intStatus === 'COMPLETED' || intStatus === 'ENDED' || empStatus === 'completed') {
-      const error = new Error(`The internship for '${employee.firstName} ${employee.lastName}' has already been officially ended.`);
-      error.statusCode = 400;
-      throw error;
-    }
+  /**
+   * List all departments
+   */
+  async listDepartments(orgId) {
+    const sql = `SELECT * FROM departments WHERE org_id = $1 ORDER BY name ASC;`;
+    const res = await query(sql, [orgId]);
+    return res.rows;
+  },
 
-    // 6. Record internship end date using standard YYYY-MM-DD
-    const today = new Date();
-    const y = today.getFullYear();
-    const m = String(today.getMonth() + 1).padStart(2, '0');
-    const d = String(today.getDate()).padStart(2, '0');
-    const currentDateStr = `${y}-${m}-${d}`;
-    const endDate = (options.endDate && typeof options.endDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(options.endDate.trim()))
-      ? options.endDate.trim()
-      : currentDateStr;
-
-    // 7. Update status and internship details while preserving all historical records
-    const updatedEmp = await employeeRepository.update(id, {
-      status: 'Completed',
-      internshipStatus: 'COMPLETED',
-      internshipEndDate: endDate,
-    });
-
-    // 8. Auto-provision Exit Checklist and Offboarding Clearances for the Intern
-    let exitChecklist = null;
-    try {
-      exitChecklist = await this.ensureExitChecklistForEmployee(
-        updatedEmp || employee,
-        {
-          status: 'Completed',
-          internshipStatus: 'COMPLETED',
-          resignationDate: endDate,
-          lastWorkingDay: endDate,
-          notes: options.notes || `End of Internship for ${employee.firstName} ${employee.lastName || ''} (${employee.employeeCode || employee.id}). Auto-routed to Exit Checklist on ${endDate}.`,
-        },
-        currentUser
-      );
-    } catch (checklistErr) {
-      logger.warn('END_INTERNSHIP', `Could not auto-generate exit checklist: ${checklistErr.message}`);
-    }
-
-    // 10. In-app notification for intern
-    if (employee.userId) {
-      try {
-        await notificationRepository.create({
-          orgId: employee.orgId,
-          userId: employee.userId,
-          eventType: 'INTERNSHIP_ENDED',
-          title: 'Internship Concluded & Exit Checklist Initiated',
-          message: `Your internship has officially ended on ${endDate}. Your Exit Clearance Checklist is now active.`,
-          entityType: 'EXIT_CHECKLIST',
-          entityId: exitChecklist?.id || employee.id,
-          actionUrl: '/exit/checklist?tab=my',
-        });
-      } catch {
-        // Non-blocking
-      }
-    }
-
-    // 11. Audit log for compliance and timeline tracking
-    try {
-      await pool.query(
-        `INSERT INTO admin_audit_logs (id, org_id, user_id, action_type, target_entity, target_id, changes, ip_address, created_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, NOW());`,
-        [
-          `audit-int-${Date.now()}`,
-          employee.orgId,
-          currentUser?.id || null,
-          'END_INTERNSHIP',
-          'EMPLOYEE',
-          employee.id,
-          JSON.stringify({
-            employeeCode: employee.employeeCode,
-            fullName: `${employee.firstName} ${employee.lastName}`,
-            previousStatus: employee.status,
-            newStatus: 'Completed',
-            internshipStatus: 'COMPLETED',
-            internshipEndDate: endDate,
-            exitChecklistId: exitChecklist?.id || null,
-            endedBy: currentUser?.email || 'HR/Admin',
-          }),
-          'Internal HRMS',
-        ]
-      );
-    } catch {
-      // Non-blocking
-    }
-
-    return {
-      ...updatedEmp,
-      exitChecklist,
-    };
+  /**
+   * List all designations
+   */
+  async listDesignations(orgId) {
+    const sql = `SELECT * FROM designations WHERE org_id = $1 ORDER BY title ASC;`;
+    const res = await query(sql, [orgId]);
+    return res.rows;
   },
 };

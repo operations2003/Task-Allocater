@@ -1,11 +1,9 @@
 import { verifyToken } from '../utils/tokenUtils.js';
-import { userRepository } from '../repositories/userRepository.js';
-import { employeeRepository } from '../repositories/employeeRepository.js';
+import { query } from '../config/db.js';
 import { sendError } from '../utils/apiResponse.js';
-import { enforceActiveWorkday } from './workdayMiddleware.js';
 
 /**
- * Authentication Middleware
+ * Authentication Middleware for TaskNera CEO Command Centre
  * Enforces valid Bearer JWT token on protected routes
  */
 export const authenticate = async (req, res, next) => {
@@ -33,47 +31,48 @@ export const authenticate = async (req, res, next) => {
       return sendError(res, 'Invalid authentication token.', 401, ['Token verification failed']);
     }
 
-    // 1. Verify user exists and is actively enabled
-    const user = await userRepository.findById(decoded.id);
-    if (!user || user.status !== 'Active') {
+    // 1. Verify user exists and is actively enabled in CEO Command Centre DB
+    const userRes = await query(
+      `SELECT u.id, u.org_id, u.email, u.role, u.is_active,
+              e.id AS employee_id, e.first_name, e.last_name, e.employee_code,
+              e.dept_id, e.desig_id, e.avatar_url,
+              d.name AS dept_name, ds.title AS desig_title
+       FROM users u
+       LEFT JOIN employees e ON e.user_id = u.id
+       LEFT JOIN departments d ON e.dept_id = d.id
+       LEFT JOIN designations ds ON e.desig_id = ds.id
+       WHERE u.id = $1
+       LIMIT 1;`,
+      [decoded.id]
+    );
+
+    if (userRes.rows.length === 0 || !userRes.rows[0].is_active) {
       return sendError(res, 'User account not found, deactivated, or disabled.', 401, [
         'Inactive or disabled account',
       ]);
     }
 
-    // 2. Verify associated employee profile has not been deprovisioned / exited
-    const emp = await employeeRepository.findByUserId(user.id, user.orgId);
-    const normRole = (user.roleName || '').toLowerCase();
-    if (normRole !== 'superadmin') {
-      if (emp && (emp.status === 'Exited' || emp.status === 'Terminated' || emp.status === 'Inactive')) {
-        return sendError(res, 'Access denied: Your employee account has been deprovisioned.', 401, [
-          `Employment status is '${emp.status}'`,
-        ]);
-      }
-    }
+    const row = userRes.rows[0];
 
-    // Attach sanitized user information to request
     req.user = {
-      id: user.id,
-      email: user.email,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      orgId: user.orgId,
-      roleId: user.roleId,
-      roleName: user.roleName,
-      permissions: user.permissions,
-      organization: user.organization,
-      employeeId: emp ? emp.id : null,
-      employeeCode: emp ? emp.employeeCode : null,
-      deptId: emp ? emp.deptId : null,
-      department: emp?.department || null,
-      departmentName: emp?.department?.name || null,
-      departmentCode: emp?.department?.code || null,
-      managerId: emp ? emp.managerId : null,
-      timezone: emp?.timezone || 'Asia/Kolkata',
+      id: row.id,
+      orgId: row.org_id,
+      email: row.email,
+      role: row.role, // 'CEO' | 'Employee' | 'AI_System'
+      roleName: row.role,
+      isCeo: row.role === 'CEO',
+      employeeId: row.employee_id,
+      firstName: row.first_name || (row.role === 'CEO' ? 'CEO' : 'User'),
+      lastName: row.last_name || 'Executive',
+      employeeCode: row.employee_code,
+      deptId: row.dept_id,
+      deptName: row.dept_name,
+      desigId: row.desig_id,
+      desigTitle: row.desig_title,
+      avatarUrl: row.avatar_url,
     };
 
-    return enforceActiveWorkday(req, res, next);
+    next();
   } catch (error) {
     next(error);
   }

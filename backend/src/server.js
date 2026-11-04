@@ -1,23 +1,26 @@
 import app from './app.js';
 import { config } from './config/index.js';
-import { initDataStore } from './repositories/dataStore.js';
-import { startAttendanceAutoLogoutJob } from './services/attendanceCronService.js';
+import { query } from './config/db.js';
 
 const startServer = async () => {
   try {
-    // Initialize test credentials and repository data store
-    await initDataStore();
+    // Verify database connectivity
+    try {
+      await query('SELECT 1;');
+      console.log('✅ Connected to CEO Command Centre Database.');
+    } catch (dbErr) {
+      console.warn('⚠️ Database connection warning:', dbErr.message);
+    }
 
-    app.listen(config.port, () => {
-      console.log('====================================================');
-      console.log(`🚀 HRMS Portal Backend Server Running`);
-      console.log(`📡 Environment : ${config.nodeEnv}`);
-      console.log(`🌐 URL         : http://localhost:${config.port}`);
-      console.log(`🩺 Health Check: http://localhost:${config.port}/api/v1/health`);
-      console.log('====================================================');
+    const port = config.port || 5000;
 
-      // Initialize background attendance auto-logout job (runs every 10 mins)
-      startAttendanceAutoLogoutJob();
+    app.listen(port, () => {
+      console.log('====================================================');
+      console.log(`👑 TaskNera CEO Command Centre Backend Server Online`);
+      console.log(`📡 Environment : ${config.nodeEnv || 'development'}`);
+      console.log(`🌐 API Base    : http://localhost:${port}/api`);
+      console.log(`🩺 Health Check: http://localhost:${port}/api/v1/health`);
+      console.log('====================================================');
     });
   } catch (error) {
     console.error('Failed to start server:', error);
@@ -25,7 +28,7 @@ const startServer = async () => {
   }
 };
 
-// Protect server from unexpected remote connection dropouts
+// Protect server from unexpected connection dropouts
 process.on('unhandledRejection', (reason, promise) => {
   console.error('⚠️ [Server] Unhandled Rejection at:', promise, 'reason:', reason);
 });

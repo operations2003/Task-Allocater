@@ -1,88 +1,43 @@
 import { query } from '../config/db.js';
-import { adminService } from './adminService.js';
-import { notificationService } from './notificationService.js';
-import { checkIsEmployeeCeoOrAdmin } from '../utils/roleUtils.js';
+import { auditService } from './auditService.js';
+import { approvalService } from './approvalService.js';
 
+/**
+ * Employee Task Operations Service for TaskNera CEO Command Centre
+ * Strictly scoped so employees can only access, update, and request extensions on their own assigned tasks.
+ */
 export const taskService = {
   /**
-   * List tasks for an organization with rich filtering
+   * List tasks for the currently authenticated employee
    */
-  async listTasks(orgId, currentUser, filters = {}) {
+  async getMyTasks(orgId, currentUser, filters = {}) {
+    const employeeId = currentUser.employeeId;
+    if (!employeeId) {
+      return [];
+    }
+
     let sql = `
       SELECT t.*,
-             c.first_name AS creator_first, c.last_name AS creator_last, c.employee_code AS creator_code, c.avatar_url AS creator_avatar,
-             cd.title AS creator_designation, cdept.name AS creator_dept_name,
-             a.first_name AS assignee_first, a.last_name AS assignee_last, a.employee_code AS assignee_code, a.avatar_url AS assignee_avatar,
-             ad.title AS assignee_designation, adept.name AS assignee_dept_name,
-             r.first_name AS rater_first, r.last_name AS rater_last,
-             d.name AS department_name,
-             CASE 
-               WHEN t.status != 'COMPLETED' AND t.status != 'CANCELLED' AND t.due_date < CURRENT_DATE THEN true
+             c.first_name AS creator_first, c.last_name AS creator_last,
+             d.name AS dept_name,
+             CASE
+               WHEN t.status NOT IN ('COMPLETED', 'CANCELLED') AND t.due_date < CURRENT_DATE THEN true
                ELSE false
              END AS is_overdue
       FROM work_tasks t
-      JOIN employees c ON t.creator_id = c.id
-      LEFT JOIN designations cd ON c.desig_id = cd.id
-      LEFT JOIN departments cdept ON c.dept_id = cdept.id
-      JOIN employees a ON t.assignee_id = a.id
-      LEFT JOIN designations ad ON a.desig_id = ad.id
-      LEFT JOIN departments adept ON a.dept_id = adept.id
-      LEFT JOIN employees r ON t.rated_by = r.id
+      LEFT JOIN employees c ON t.creator_id = c.id
       LEFT JOIN departments d ON t.dept_id = d.id
-      WHERE t.org_id = $1
+      WHERE t.org_id = $1 AND t.assignee_id = $2
     `;
-    const params = [orgId];
+    const params = [orgId, employeeId];
 
-    const normRole = (currentUser.roleName || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-    const isPrivileged = ['superadmin', 'admin', 'orgadmin', 'hr', 'hrmanager'].includes(normRole);
-    const isManager = ['manager', 'teamlead', 'lead', 'supervisor'].includes(normRole);
-
-    let empId = currentUser.employeeId;
-    if (!empId && currentUser.id) {
-      const eRes = await query('SELECT id FROM employees WHERE user_id = $1 AND org_id = $2;', [currentUser.id, orgId]);
-      if (eRes.rows[0]) empId = eRes.rows[0].id;
-    }
-
-    // Strict access control: Regular employees can ONLY see their own tasks (never everyone's tasks)
-    if (!isPrivileged && !isManager) {
-      params.push(empId || 'unmatched-emp-id');
-      sql += ` AND (t.assignee_id = $${params.length} OR t.creator_id = $${params.length})`;
-    } else if (filters.scope === 'mine' && empId) {
-      params.push(empId);
-      sql += ` AND (t.assignee_id = $${params.length} OR t.creator_id = $${params.length})`;
-    } else if ((filters.scope === 'team' || (isManager && !isPrivileged && filters.scope !== 'all')) && empId) {
-      params.push(empId);
-      sql += ` AND (t.assignee_id = $${params.length} OR t.creator_id = $${params.length} OR a.manager_id = $${params.length})`;
-    }
-
-    if (filters.creatorId) {
-      params.push(filters.creatorId);
-      sql += ` AND t.creator_id = $${params.length}`;
-    }
-    if (filters.assigneeId) {
-      params.push(filters.assigneeId);
-      sql += ` AND t.assignee_id = $${params.length}`;
-    }
     if (filters.status) {
-      params.push(filters.status);
+      params.push(filters.status.toUpperCase());
       sql += ` AND t.status = $${params.length}`;
     }
     if (filters.priority) {
-      params.push(filters.priority);
+      params.push(filters.priority.toUpperCase());
       sql += ` AND t.priority = $${params.length}`;
-    }
-    if (filters.deptId || filters.departmentId) {
-      params.push(filters.deptId || filters.departmentId);
-      sql += ` AND (t.dept_id = $${params.length} OR a.dept_id = $${params.length})`;
-    }
-    if (filters.search) {
-      params.push(`%${filters.search.toLowerCase()}%`);
-      sql += ` AND (
-        LOWER(t.title) LIKE $${params.length} 
-        OR LOWER(t.description) LIKE $${params.length}
-        OR LOWER(c.first_name || ' ' || c.last_name) LIKE $${params.length}
-        OR LOWER(a.first_name || ' ' || a.last_name) LIKE $${params.length}
-      )`;
     }
 
     sql += ` ORDER BY is_overdue DESC, t.due_date ASC NULLS LAST, t.created_at DESC;`;
@@ -92,527 +47,162 @@ export const taskService = {
   },
 
   /**
-   * Create task
+   * Update task progress (0-100%), status, and completion evidence
    */
-  async createTask(orgId, currentUser, payload) {
-    const normRole = (currentUser.roleName || '').toLowerCase();
-    const allowedAssignerRoles = ['admin', 'superadmin', 'orgadmin', 'hr', 'hrmanager', 'manager'];
-    if (!allowedAssignerRoles.includes(normRole)) {
-      const err = new Error('Access denied: Only Admin, HR, and Manager can create and assign tasks.');
-      err.statusCode = 403;
-      throw err;
-    }
-
-    const creatorId = currentUser.employeeId;
-    if (!creatorId) {
-      const err = new Error('You must be linked to an employee profile to create tasks.');
-      err.statusCode = 400;
-      throw err;
-    }
-
-    const assigneeId = payload.assigneeId || creatorId;
-
-    // Enforce business rule: The CEO/Admin must NEVER be a target of work assignment
-    const isAssigneeCeo = await checkIsEmployeeCeoOrAdmin(assigneeId, orgId);
-    if (isAssigneeCeo) {
-      const err = new Error('Forbidden: Work or tasks cannot be assigned to the CEO or Administrator. Please assign to an operational team member.');
-      err.statusCode = 400;
-      throw err;
-    }
-
-    const id = `tsk-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
-
-    const res = await query(
-      `INSERT INTO work_tasks (
-        id, org_id, title, description, creator_id, assignee_id, dept_id,
-        priority, status, due_date, subtasks, comments, attachments, created_at, updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'TODO', $9, $10, $11, $12, NOW(), NOW())
-      RETURNING *;`,
-      [
-        id,
-        orgId,
-        payload.title,
-        payload.description || '',
-        creatorId,
-        assigneeId,
-        payload.deptId || null,
-        payload.priority || 'MEDIUM',
-        payload.dueDate || null,
-        JSON.stringify(payload.subtasks || []),
-        JSON.stringify([]),
-        JSON.stringify(payload.attachments || []),
-      ]
-    );
-
-    const task = res.rows[0];
-
-    // Notify assignee
-    if (assigneeId !== creatorId) {
-      const aRes = await query('SELECT user_id FROM employees WHERE id = $1;', [assigneeId]);
-      if (aRes.rows[0]?.user_id) {
-        await notificationService.createNotification({
-          orgId,
-          userId: aRes.rows[0].user_id,
-          eventType: 'TASK_ASSIGNED',
-          title: `New Task Assigned: ${task.title}`,
-          message: `${currentUser.firstName} assigned you a task with priority '${task.priority}'. Due: ${task.due_date || 'N/A'}.`,
-          entityType: 'TASK',
-          entityId: id,
-        }).catch(() => {});
-      }
-    }
-
-    return task;
-  },
-
-  /**
-   * Enforce task access authorization (Regular employees can only access their own tasks)
-   */
-  async verifyTaskAccess(taskId, orgId, currentUser) {
-    const normRole = (currentUser.roleName || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-    const isPrivileged = ['superadmin', 'admin', 'orgadmin', 'hr', 'hrmanager'].includes(normRole);
-    const isManager = ['manager', 'teamlead', 'lead', 'supervisor'].includes(normRole);
-    if (isPrivileged || isManager) return;
-
-    let empId = currentUser.employeeId;
-    if (!empId && currentUser.id) {
-      const eRes = await query('SELECT id FROM employees WHERE user_id = $1 AND org_id = $2;', [currentUser.id, orgId]);
-      if (eRes.rows[0]) empId = eRes.rows[0].id;
-    }
-
-    const checkRes = await query(
-      'SELECT id FROM work_tasks WHERE id = $1 AND org_id = $2 AND (assignee_id = $3 OR creator_id = $3);',
-      [taskId, orgId, empId]
-    );
-    if (checkRes.rows.length === 0) {
-      const err = new Error('Access denied: You can only access your own assigned tasks.');
-      err.statusCode = 403;
-      throw err;
-    }
-  },
-
-  /**
-   * Update task status (e.g. from Kanban drag or status dropdown)
-   */
-  async updateStatus(taskId, orgId, currentUser, status) {
-    await this.verifyTaskAccess(taskId, orgId, currentUser);
-
-    const validStatuses = ['TODO', 'IN_PROGRESS', 'BLOCKED', 'COMPLETED', 'CANCELLED'];
-    if (!validStatuses.includes(status)) {
-      const err = new Error(`Invalid status '${status}'. Must be one of ${validStatuses.join(', ')}.`);
-      err.statusCode = 400;
-      throw err;
-    }
-
-    const res = await query(
-      `UPDATE work_tasks 
-       SET status = $1, updated_at = NOW() 
-       WHERE id = $2 AND org_id = $3
-       RETURNING *;`,
-      [status, taskId, orgId]
-    );
-
-    if (res.rows.length === 0) {
-      const err = new Error('Task not found.');
-      err.statusCode = 404;
-      throw err;
-    }
-
-    return res.rows[0];
-  },
-
-  /**
-   * Add comment to task
-   */
-  async addComment(taskId, orgId, currentUser, text) {
-    await this.verifyTaskAccess(taskId, orgId, currentUser);
-
-    const taskRes = await query('SELECT comments FROM work_tasks WHERE id = $1 AND org_id = $2;', [taskId, orgId]);
-    if (taskRes.rows.length === 0) {
-      const err = new Error('Task not found.');
-      err.statusCode = 404;
-      throw err;
-    }
-
-    const comments = taskRes.rows[0].comments || [];
-    comments.push({
-      id: `comment-${Date.now()}`,
-      authorName: `${currentUser.firstName} ${currentUser.lastName}`.trim(),
-      authorId: currentUser.id,
-      text,
-      createdAt: new Date().toISOString(),
-    });
-
-    const res = await query(
-      `UPDATE work_tasks 
-       SET comments = $1, updated_at = NOW() 
-       WHERE id = $2 AND org_id = $3 
-       RETURNING *;`,
-      [JSON.stringify(comments), taskId, orgId]
-    );
-
-    return res.rows[0];
-  },
-
-  /**
-   * Toggle subtask completion
-   */
-  async updateSubtasks(taskId, orgId, subtasks, currentUser) {
-    if (currentUser) {
-      await this.verifyTaskAccess(taskId, orgId, currentUser);
-    }
-    const res = await query(
-      `UPDATE work_tasks 
-       SET subtasks = $1, updated_at = NOW() 
-       WHERE id = $2 AND org_id = $3 
-       RETURNING *;`,
-      [JSON.stringify(subtasks), taskId, orgId]
-    );
-    if (res.rows.length === 0) {
-      const err = new Error('Task not found.');
-      err.statusCode = 404;
-      throw err;
-    }
-    return res.rows[0];
-  },
-
-  /**
-   * Rate a completed task (Admin, HR, Manager only)
-   */
-  async rateTask(taskId, orgId, currentUser, { rating, feedback }) {
-    const normRole = (currentUser.roleName || '').toLowerCase();
-    const allowedAssignerRoles = ['admin', 'superadmin', 'orgadmin', 'hr', 'hrmanager', 'manager'];
-    if (!allowedAssignerRoles.includes(normRole)) {
-      const err = new Error('Access denied: Only Admin, HR, and Manager can rate completed tasks.');
-      err.statusCode = 403;
-      throw err;
-    }
-
-    const taskRes = await query('SELECT * FROM work_tasks WHERE id = $1 AND org_id = $2;', [taskId, orgId]);
-    if (taskRes.rows.length === 0) {
-      const err = new Error('Task not found.');
-      err.statusCode = 404;
-      throw err;
-    }
-
+  async updateProgress(id, orgId, currentUser, { progress, status, notes = '', evidenceLink = null }) {
+    const taskRes = await query(`SELECT * FROM work_tasks WHERE id = $1 AND org_id = $2;`, [id, orgId]);
+    if (taskRes.rows.length === 0) throw new Error('Task not found.');
     const task = taskRes.rows[0];
 
-    // Only completed tasks can be rated
-    if (task.status !== 'COMPLETED') {
-      const err = new Error('Only completed tasks can be reviewed and rated.');
-      err.statusCode = 400;
-      throw err;
+    // Ownership validation: regular employees can ONLY update tasks assigned to them
+    if (!currentUser.isCeo && task.assignee_id !== currentUser.employeeId) {
+      throw new Error('Access denied: You can only update tasks assigned to your employee account.');
     }
 
-    const numRating = parseFloat(rating);
-    if (isNaN(numRating) || numRating < 1 || numRating > 5) {
-      const err = new Error('Rating must be a number between 1.0 and 5.0.');
-      err.statusCode = 400;
-      throw err;
-    }
+    const newProgress = progress !== undefined ? Math.max(0, Math.min(100, parseInt(progress, 10))) : task.progress;
+    const newStatus = status ? status.toUpperCase() : (newProgress === 100 ? 'COMPLETED' : task.status);
 
-    // Resolve rater employee ID
-    let raterEmpId = currentUser.employeeId;
-    if (!raterEmpId) {
-      const eRes = await query('SELECT id FROM employees WHERE user_id = $1 AND org_id = $2;', [currentUser.id, orgId]);
-      if (eRes.rows[0]) raterEmpId = eRes.rows[0].id;
-    }
-
-    const raterName = `${currentUser.firstName || ''} ${currentUser.lastName || ''}`.trim() || currentUser.name || 'Manager';
-    const cleanFeedback = feedback ? feedback.trim() : null;
-
-    // Append rating event to comments
-    const comments = task.comments || [];
-    comments.push({
-      id: `comment-rating-${Date.now()}`,
-      authorName: raterName,
-      authorId: currentUser.id,
-      text: `[TASK_RATED] Rated ${numRating} / 5 stars ⭐${cleanFeedback ? ` — Feedback: "${cleanFeedback}"` : ''}`,
-      createdAt: new Date().toISOString(),
-    });
-
-    const res = await query(
-      `UPDATE work_tasks
-       SET rating = $1,
-           rating_feedback = $2,
-           rated_by = $3,
-           rated_at = NOW(),
-           comments = $4,
-           updated_at = NOW()
-       WHERE id = $5 AND org_id = $6
-       RETURNING *;`,
-      [numRating, cleanFeedback, raterEmpId, JSON.stringify(comments), taskId, orgId]
-    );
-
-    const updatedTask = res.rows[0];
-
-    // Send notification to assignee
-    if (task.assignee_id) {
-      const aRes = await query('SELECT user_id FROM employees WHERE id = $1;', [task.assignee_id]);
-      if (aRes.rows[0]?.user_id) {
-        await notificationService.createNotification({
-          orgId,
-          userId: aRes.rows[0].user_id,
-          eventType: 'TASK_RATED',
-          title: `Task Rated: ${numRating}/5 for "${task.title}"`,
-          message: `${raterName} rated your completed task ${numRating}/5.${cleanFeedback ? ` Feedback: "${cleanFeedback}"` : ''}`,
-          entityType: 'TASK',
-          entityId: taskId,
-        }).catch(() => {});
-      }
-    }
-
-    return updatedTask;
-  },
-
-  /**
-   * Reopen a task for revisions (Admin, HR, Manager only)
-   */
-  async reopenTask(taskId, orgId, currentUser, { reason }) {
-    const normRole = (currentUser.roleName || '').toLowerCase();
-    const allowedAssignerRoles = ['admin', 'superadmin', 'orgadmin', 'hr', 'hrmanager', 'manager'];
-    if (!allowedAssignerRoles.includes(normRole)) {
-      const err = new Error('Access denied: Only Admin, HR, and Manager can reopen tasks.');
-      err.statusCode = 403;
-      throw err;
-    }
-
-    const taskRes = await query('SELECT * FROM work_tasks WHERE id = $1 AND org_id = $2;', [taskId, orgId]);
-    if (taskRes.rows.length === 0) {
-      const err = new Error('Task not found.');
-      err.statusCode = 404;
-      throw err;
-    }
-
-    const task = taskRes.rows[0];
-    const comments = task.comments || [];
-    const reviewerName = `${currentUser.firstName || ''} ${currentUser.lastName || ''}`.trim() || currentUser.name || 'Manager';
-    const reopenNote = reason && reason.trim() ? reason.trim() : 'Task reopened for revisions and completion.';
-
-    comments.push({
-      id: `comment-reopen-${Date.now()}`,
-      authorName: reviewerName,
-      authorId: currentUser.id,
-      text: `[TASK_REOPENED] ${reopenNote}`,
-      createdAt: new Date().toISOString(),
-    });
-
-    const res = await query(
-      `UPDATE work_tasks
-       SET status = 'IN_PROGRESS',
-           reopen_count = COALESCE(reopen_count, 0) + 1,
-           rating = NULL,
-           rating_feedback = NULL,
-           comments = $1,
-           updated_at = NOW()
-       WHERE id = $2 AND org_id = $3
-       RETURNING *;`,
-      [JSON.stringify(comments), taskId, orgId]
-    );
-
-    const updatedTask = res.rows[0];
-
-    // Send notification to assignee
-    if (task.assignee_id) {
-      const aRes = await query('SELECT user_id FROM employees WHERE id = $1;', [task.assignee_id]);
-      if (aRes.rows[0]?.user_id) {
-        await notificationService.createNotification({
-          orgId,
-          userId: aRes.rows[0].user_id,
-          eventType: 'TASK_REOPENED',
-          title: `Task Reopened: "${task.title}"`,
-          message: `${reviewerName} reopened your task for revisions: "${reopenNote}"`,
-          entityType: 'TASK',
-          entityId: taskId,
-        }).catch(() => {});
-      }
-    }
-
-    return updatedTask;
-  },
-
-  /**
-   * Get employee's personal work performance metrics
-   */
-  async getMyPerformance(orgId, currentUser, timeframe = 'this_month') {
-    let empId = currentUser.employeeId;
-    if (!empId) {
-      const eRes = await query('SELECT id FROM employees WHERE user_id = $1 AND org_id = $2;', [currentUser.id, orgId]);
-      if (eRes.rows[0]) {
-        empId = eRes.rows[0].id;
-      }
-    }
-
-    if (!empId) {
-      return {
-        performanceScore: 0,
-        performanceStatus: 'Needs Improvement',
-        totalTasks: 0,
-        completedTasks: 0,
-        createdTasks: 0,
-        completionRate: 0,
-        onTimeDelivery: 0,
-        averageRating: 0,
-        ratingCount: 0,
-        firstTimeCompletion: 0,
-        tasksReopened: 0,
-        reopenRate: 0,
-        overdueTasks: 0,
-        priority: { high: 0, medium: 0, low: 0 },
-        last30DaysTrend: [],
-      };
-    }
-
-    // Determine timeframe boundaries
-    const now = new Date();
-    let startDate = null;
-    const tf = (timeframe || '').toLowerCase().replace(/[\s-]/g, '_');
-
-    if (tf === 'this_week') {
-      const day = now.getDay();
-      const diff = now.getDate() - day + (day === 0 ? -6 : 1);
-      startDate = new Date(now.setDate(diff));
-      startDate.setHours(0, 0, 0, 0);
-    } else if (tf === 'last_month') {
-      startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    } else if (tf === 'this_quarter') {
-      const qMonth = Math.floor(now.getMonth() / 3) * 3;
-      startDate = new Date(now.getFullYear(), qMonth, 1);
-    } else if (tf === 'this_year') {
-      startDate = new Date(now.getFullYear(), 0, 1);
-    } else if (tf === 'all_time') {
-      startDate = null;
-    } else {
-      // Default: this_month
-      startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-    }
-
-    let sql = `
-      SELECT t.*,
-             CASE 
-               WHEN t.status != 'COMPLETED' AND t.status != 'CANCELLED' AND t.due_date < CURRENT_DATE THEN true
-               ELSE false
-             END AS is_overdue
-      FROM work_tasks t
-      WHERE t.org_id = $1 AND (t.assignee_id = $2 OR t.creator_id = $2)
-    `;
-    const params = [orgId, empId];
-
-    if (startDate) {
-      params.push(startDate.toISOString());
-      sql += ` AND t.created_at >= $${params.length}`;
-    }
-
-    const res = await query(sql, params);
-    const tasks = res.rows;
-
-    const assignedTasks = tasks.filter((t) => t.assignee_id === empId);
-    const totalTasks = assignedTasks.length;
-    const createdTasks = tasks.filter((t) => t.creator_id === empId).length;
-    const completedTasks = assignedTasks.filter((t) => t.status === 'COMPLETED').length;
-    const completionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
-
-    const onTimeTasks = assignedTasks.filter((t) => {
-      if (t.status !== 'COMPLETED') return false;
-      if (!t.due_date) return true;
-      const compDate = new Date(t.updated_at);
-      const dueDate = new Date(t.due_date);
-      dueDate.setHours(23, 59, 59, 999);
-      return compDate <= dueDate;
-    }).length;
-    const onTimeDelivery = completedTasks > 0 ? Math.round((onTimeTasks / completedTasks) * 100) : 0;
-
-    // Rated tasks & average rating calculation
-    const ratedTasks = assignedTasks.filter((t) => t.rating != null && Number(t.rating) > 0);
-    const totalRating = ratedTasks.reduce((sum, t) => sum + Number(t.rating), 0);
-    const averageRating = ratedTasks.length > 0 ? parseFloat((totalRating / ratedTasks.length).toFixed(1)) : 0;
-    const ratingCount = ratedTasks.length;
-
-    // First time completion (completed with 0 reopens)
-    const firstTimeTasks = assignedTasks.filter((t) => {
-      if (t.status !== 'COMPLETED') return false;
-      return !t.reopen_count || Number(t.reopen_count) === 0;
-    }).length;
-    const firstTimeCompletion = completedTasks > 0 ? Math.round((firstTimeTasks / completedTasks) * 100) : 0;
-
-    // Tasks reopened
-    const tasksReopened = assignedTasks.filter((t) => Number(t.reopen_count || 0) > 0).length;
-    const reopenRate = totalTasks > 0 ? Math.round((tasksReopened / totalTasks) * 100) : 0;
-
-    const overdueTasks = assignedTasks.filter((t) => t.is_overdue).length;
-
-    // Priority breakdown for assigned tasks
-    const priority = {
-      high: assignedTasks.filter((t) => t.priority === 'HIGH' || t.priority === 'URGENT').length,
-      medium: assignedTasks.filter((t) => t.priority === 'MEDIUM').length,
-      low: assignedTasks.filter((t) => t.priority === 'LOW').length,
-    };
-
-    // Calculate dynamic performance score
-    let performanceScore = 0;
-    let performanceStatus = 'Needs Improvement';
-
-    if (totalTasks > 0) {
-      const ratingNormalized = ratedTasks.length > 0 ? (averageRating / 5) * 100 : completionRate;
-      performanceScore = Math.min(
-        100,
-        Math.max(
-          0,
-          Math.round(
-            completionRate * 0.3 +
-            onTimeDelivery * 0.25 +
-            firstTimeCompletion * 0.25 +
-            ratingNormalized * 0.2 -
-            (overdueTasks / totalTasks) * 15
-          )
-        )
-      );
-
-      if (performanceScore >= 85) performanceStatus = 'Outstanding';
-      else if (performanceScore >= 70) performanceStatus = 'Good';
-      else if (performanceScore >= 50) performanceStatus = 'Satisfactory';
-      else performanceStatus = 'Needs Improvement';
-    }
-
-    // Generate last 30 days completed tasks distribution
-    const last30DaysTrend = [];
-    const today = new Date();
-    for (let i = 29; i >= 0; i--) {
-      const d = new Date(today);
-      d.setDate(d.getDate() - i);
-      const ymd = d.toISOString().split('T')[0];
-      const label = d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
-
-      const dayCompleted = assignedTasks.filter((t) => {
-        if (t.status !== 'COMPLETED') return false;
-        const compYmd = new Date(t.updated_at).toISOString().split('T')[0];
-        return compYmd === ymd;
-      }).length;
-
-      last30DaysTrend.push({
-        date: ymd,
-        label,
-        completed: dayCompleted,
+    const completionEvidence = Array.isArray(task.completion_evidence) ? [...task.completion_evidence] : [];
+    if (evidenceLink) {
+      completionEvidence.push({
+        url: evidenceLink,
+        submittedAt: new Date().toISOString(),
+        notes,
+        submittedBy: `${currentUser.firstName || ''} ${currentUser.lastName || ''}`.trim(),
       });
     }
 
-    return {
-      performanceScore,
-      performanceStatus,
-      totalTasks,
-      completedTasks,
-      createdTasks,
-      completionRate,
-      onTimeDelivery,
-      averageRating,
-      ratingCount,
-      firstTimeCompletion,
-      tasksReopened,
-      reopenRate,
-      overdueTasks,
-      priority,
-      last30DaysTrend,
+    const completionDate = newStatus === 'COMPLETED' ? new Date() : (task.status === 'COMPLETED' && newStatus !== 'COMPLETED' ? null : task.completion_date);
+
+    const updateSql = `
+      UPDATE work_tasks
+      SET progress = $1,
+          status = $2,
+          completion_evidence = $3,
+          completion_date = $4,
+          updated_at = NOW()
+      WHERE id = $5 AND org_id = $6
+      RETURNING *;
+    `;
+    const res = await query(updateSql, [
+      newProgress,
+      newStatus,
+      JSON.stringify(completionEvidence),
+      completionDate,
+      id,
+      orgId,
+    ]);
+    const updated = res.rows[0];
+
+    // Log immutable audit entry
+    await auditService.logEvent({
+      taskId: id,
+      orgId,
+      actorId: currentUser.employeeId,
+      actorName: `${currentUser.firstName || ''} ${currentUser.lastName || ''}`.trim() || 'Employee',
+      actorType: currentUser.isCeo ? 'CEO' : 'EMPLOYEE',
+      action: 'PROGRESS_UPDATED',
+      previousValues: { progress: task.progress, status: task.status },
+      updatedValues: { progress: newProgress, status: newStatus },
+      notes: notes || `Progress updated to ${newProgress}%. Status: ${newStatus}`,
+    });
+
+    return updated;
+  },
+
+  /**
+   * Request deadline extension
+   * Routes the request directly into the CEO executive approval queue!
+   */
+  async requestDeadlineExtension(id, orgId, currentUser, { proposedDate, reason }) {
+    if (!proposedDate || !reason) {
+      throw new Error('Proposed deadline date and detailed reason are required.');
+    }
+
+    const taskRes = await query(`SELECT * FROM work_tasks WHERE id = $1 AND org_id = $2;`, [id, orgId]);
+    if (taskRes.rows.length === 0) throw new Error('Task not found.');
+    const task = taskRes.rows[0];
+
+    // Ownership check
+    if (!currentUser.isCeo && task.assignee_id !== currentUser.employeeId) {
+      throw new Error('Access denied: You can only request deadline extensions for tasks assigned to you.');
+    }
+
+    // Set delay reason on task
+    await query(
+      `UPDATE work_tasks SET delay_reason = $1, approval_status = 'AWAITING_APPROVAL', updated_at = NOW() WHERE id = $2;`,
+      [reason, id]
+    );
+
+    // Queue in Executive Approval Centre for CEO review
+    const approval = await approvalService.createRequest(orgId, {
+      requestType: 'DEADLINE_EXTENSION',
+      title: `Deadline Extension Request: ${task.title}`,
+      description: `Assignee requests deadline extension from ${task.due_date} to ${proposedDate}. Reason: ${reason}`,
+      taskId: task.id,
+      targetEmployeeId: task.assignee_id,
+      initiatedByType: 'EMPLOYEE',
+      initiatedById: currentUser.employeeId,
+      supportingInfo: {
+        currentDeadline: task.due_date,
+        proposedDeadline: proposedDate,
+        impedimentReason: reason,
+        taskPriority: task.priority,
+      },
+    });
+
+    // Audit log
+    await auditService.logEvent({
+      taskId: id,
+      orgId,
+      actorId: currentUser.employeeId,
+      actorName: `${currentUser.firstName || ''} ${currentUser.lastName || ''}`.trim() || 'Employee',
+      actorType: 'EMPLOYEE',
+      action: 'DEADLINE_MODIFIED',
+      previousValues: { currentDeadline: task.due_date },
+      updatedValues: { proposedDeadline: proposedDate },
+      notes: `Extension request submitted to CEO approval queue. Reason: ${reason}`,
+    });
+
+    return { success: true, message: 'Extension request submitted to CEO Approval Centre.', approvalId: approval.id };
+  },
+
+  /**
+   * Add a comment / update note to task
+   */
+  async addComment(id, orgId, currentUser, commentText) {
+    if (!commentText || !commentText.trim()) throw new Error('Comment text is required.');
+
+    const taskRes = await query(`SELECT * FROM work_tasks WHERE id = $1 AND org_id = $2;`, [id, orgId]);
+    if (taskRes.rows.length === 0) throw new Error('Task not found.');
+    const task = taskRes.rows[0];
+
+    const comments = Array.isArray(task.comments) ? [...task.comments] : [];
+    const newComment = {
+      text: commentText.trim(),
+      author: `${currentUser.firstName || ''} ${currentUser.lastName || ''}`.trim(),
+      role: currentUser.role,
+      avatar: currentUser.avatarUrl || null,
+      createdAt: new Date().toISOString(),
     };
+    comments.push(newComment);
+
+    const res = await query(
+      `UPDATE work_tasks SET comments = $1, updated_at = NOW() WHERE id = $2 AND org_id = $3 RETURNING *;`,
+      [JSON.stringify(comments), id, orgId]
+    );
+
+    return res.rows[0];
+  },
+
+  /**
+   * Toggle a subtask completion status
+   */
+  async updateSubtasks(id, orgId, currentUser, subtasks) {
+    const res = await query(
+      `UPDATE work_tasks SET subtasks = $1, updated_at = NOW() WHERE id = $2 AND org_id = $3 RETURNING *;`,
+      [JSON.stringify(subtasks), id, orgId]
+    );
+    return res.rows[0];
   },
 };
-

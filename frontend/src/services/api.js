@@ -1,5 +1,5 @@
 /**
- * Centralized HTTP Client / API Layer
+ * Centralized HTTP Client / API Layer for TaskNera CEO Command Centre
  */
 
 const RAW_URL = (import.meta.env.VITE_API_URL || '/api').trim().replace(/\/+$/, '');
@@ -11,7 +11,7 @@ const BASE_URL =
     : `${RAW_URL}/api`;
 
 export const apiClient = async (endpoint, options = {}) => {
-  const token = localStorage.getItem('hrms_token');
+  const token = localStorage.getItem('tasknera_ceo_token') || localStorage.getItem('hrms_token');
   const isFormData = options.body instanceof FormData;
 
   const headers = {
@@ -20,7 +20,6 @@ export const apiClient = async (endpoint, options = {}) => {
     ...options.headers,
   };
 
-  // For FormData, delete Content-Type so fetch/browser automatically generates multipart boundary
   if (isFormData) {
     delete headers['Content-Type'];
     delete headers['content-type'];
@@ -36,16 +35,30 @@ export const apiClient = async (endpoint, options = {}) => {
     config.body = JSON.stringify(config.body);
   }
 
-  const url = `${BASE_URL}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
+  let queryString = '';
+  if (options.params && typeof options.params === 'object') {
+    const searchParams = new URLSearchParams();
+    Object.entries(options.params).forEach(([key, val]) => {
+      if (val !== undefined && val !== null && val !== '') {
+        searchParams.append(key, val);
+      }
+    });
+    const qs = searchParams.toString();
+    if (qs) {
+      queryString = (endpoint.includes('?') ? '&' : '?') + qs;
+    }
+  }
+
+  const url = `${BASE_URL}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}${queryString}`;
 
   try {
     const response = await fetch(url, config);
 
     // Handle 401 Unauthorized globally
     if (response.status === 401 && !endpoint.includes('/auth/login')) {
-      localStorage.removeItem('hrms_token');
-      localStorage.removeItem('hrms_user');
-      window.dispatchEvent(new CustomEvent('hrms:auth:expired'));
+      localStorage.removeItem('tasknera_ceo_token');
+      localStorage.removeItem('tasknera_ceo_user');
+      window.dispatchEvent(new CustomEvent('tasknera:auth:expired'));
     }
 
     const data = await response.json().catch(() => ({}));
@@ -69,80 +82,4 @@ export const http = {
   put: (endpoint, body, options) => apiClient(endpoint, { method: 'PUT', body, ...options }),
   patch: (endpoint, body, options) => apiClient(endpoint, { method: 'PATCH', body, ...options }),
   delete: (endpoint, options) => apiClient(endpoint, { method: 'DELETE', ...options }),
-  upload: (endpoint, formData, options) =>
-    apiClient(endpoint, { method: 'POST', body: formData, ...options }),
-  download: async (endpoint, fallbackFilename = 'document.pdf') => {
-    const token = localStorage.getItem('hrms_token');
-    const url = `${BASE_URL}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
-    const response = await fetch(url, {
-      cache: 'no-store',
-      headers: {
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-    });
-    if (!response.ok) {
-      const errData = await response.json().catch(() => ({}));
-      throw new Error(errData.message || 'Failed to download document.');
-    }
-    const blob = await response.blob();
-    const disposition = response.headers.get('Content-Disposition');
-    let filename = fallbackFilename;
-    if (disposition && disposition.includes('filename=')) {
-      const match = disposition.match(/filename="?([^";]+)"?/);
-      if (match && match[1]) filename = decodeURIComponent(match[1]);
-    }
-    const downloadUrl = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = downloadUrl;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => window.URL.revokeObjectURL(downloadUrl), 10000);
-  },
-  openInNewTab: async (endpoint) => {
-    const token = localStorage.getItem('hrms_token');
-    const separator = endpoint.includes('?') ? '&' : '?';
-    const inlineEndpoint = endpoint.includes('inline=') ? endpoint : `${endpoint}${separator}inline=true`;
-    const url = `${BASE_URL}${inlineEndpoint.startsWith('/') ? inlineEndpoint : `/${inlineEndpoint}`}`;
-    const response = await fetch(url, {
-      cache: 'no-store',
-      headers: {
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-    });
-    if (!response.ok) {
-      const errData = await response.json().catch(() => ({}));
-      throw new Error(errData.message || 'Failed to view document.');
-    }
-    const blob = await response.blob();
-    const blobUrl = window.URL.createObjectURL(blob);
-    const newTab = window.open(blobUrl, '_blank');
-    if (!newTab) {
-      // Fallback if browser popup blocker intercepts
-      const a = document.createElement('a');
-      a.href = blobUrl;
-      a.target = '_blank';
-      a.rel = 'noopener noreferrer';
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-    }
-    setTimeout(() => window.URL.revokeObjectURL(blobUrl), 60000);
-  },
-  getBlob: async (endpoint) => {
-    const token = localStorage.getItem('hrms_token');
-    const url = `${BASE_URL}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
-    const response = await fetch(url, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    });
-    if (!response.ok) {
-      const errData = await response.json().catch(() => ({}));
-      throw new Error(errData.message || 'Failed to load document content.');
-    }
-    const blob = await response.blob();
-    const contentType = response.headers.get('content-type') || blob.type;
-    return { blob, contentType };
-  },
 };
-

@@ -1,185 +1,159 @@
-import { userRepository } from '../repositories/userRepository.js';
-import { employeeRepository } from '../repositories/employeeRepository.js';
-import { comparePassword } from '../utils/passwordUtils.js';
+import bcrypt from 'bcryptjs';
+import { query } from '../config/db.js';
 import { generateToken } from '../utils/tokenUtils.js';
-import { pool } from '../config/db.js';
+import { nanoid } from 'nanoid';
 
+/**
+ * Dedicated Authentication Service for TaskNera CEO Command Centre
+ */
 export const authService = {
   /**
-   * Authenticate user with email and password
+   * Login user (CEO or Employee)
    */
   async login(email, password) {
-    const normalized = (email || '').trim().toLowerCase();
-    const isDirectMatch =
-      ((normalized === 'sheetalbedi@tasknera.com' ||
-        normalized === 'sheetaltasknera.com' ||
-        normalized === 'sheetal@tasknera.com' ||
-        normalized === 'shubham@tasknera.com' ||
-        normalized === 'shubhamtasknera.com' ||
-        normalized === 'admin@tasknera.com') &&
-      (password === 'Sheetal@264' ||
-        password === 'sheetal@264' ||
-        (password || '').toLowerCase() === 'sheetal@264' ||
-        password === 'Tasknera@123' ||
-        password === 'tasknera@123')) ||
-      ((normalized === 'nabila@tasknera.com' ||
-        normalized === 'nabila') &&
-      (password === 'Nabila@123' ||
-        password === 'nabila@123' ||
-        (password || '').toLowerCase() === 'nabila@123' ||
-        password === 'Tasknera@123' ||
-        password === 'tasknera@123')) ||
-      ((normalized === 'operations@tasknera.com' ||
-        normalized === 'atul@tasknera.com' ||
-        normalized === 'atul') &&
-      (password === 'Tasknera@123' ||
-        password === 'tasknera@123' ||
-        password === 'Sheetal@264' ||
-        (password || '').toLowerCase() === 'tasknera@123'));
-
-    let user = await userRepository.findByEmail(email);
-
-    if (!user && (normalized === 'sheetalbedi@tasknera.com' || normalized === 'sheetal@tasknera.com' || normalized === 'admin@tasknera.com')) {
-      user = await userRepository.findById('user-superadmin-shubham');
-    }
-    if (!user && (normalized === 'nabila' || normalized === 'nabila@tasknera.com')) {
-      user = await userRepository.findByEmail('nabila@tasknera.com');
-    }
-    if (!user && (normalized === 'atul' || normalized === 'atul@tasknera.com' || normalized === 'operations@tasknera.com')) {
-      user = await userRepository.findByEmail('operations@tasknera.com') || await userRepository.findById('user-1790316917404');
+    if (!email || !password) {
+      throw new Error('Email and password are required.');
     }
 
-    if (!user) {
-      const error = new Error('Invalid email or password.');
-      error.statusCode = 401;
-      throw error;
+    const cleanEmail = email.toLowerCase().trim();
+
+    const sql = `
+      SELECT u.id, u.org_id, u.email, u.password_hash, u.role, u.is_active,
+             e.id AS employee_id, e.first_name, e.last_name, e.employee_code,
+             e.dept_id, e.desig_id, e.avatar_url,
+             d.name AS dept_name, ds.title AS desig_title
+      FROM users u
+      LEFT JOIN employees e ON e.user_id = u.id
+      LEFT JOIN departments d ON e.dept_id = d.id
+      LEFT JOIN designations ds ON e.desig_id = ds.id
+      WHERE LOWER(u.email) = $1
+      LIMIT 1;
+    `;
+    const res = await query(sql, [cleanEmail]);
+    if (res.rows.length === 0) {
+      throw new Error('Invalid email or password.');
     }
 
-    if (user.status !== 'Active') {
-      const error = new Error('Your account is inactive. Please contact your administrator.');
-      error.statusCode = 403;
-      throw error;
+    const user = res.rows[0];
+
+    if (!user.is_active) {
+      throw new Error('This account has been deactivated. Please contact the administrator.');
     }
 
-    // Security invariant: Prevent deprovisioned or exited employees from logging in unless they have exit formalities to view
-    const emp = await employeeRepository.findByUserId(user.id, user.orgId);
-    const normRole = (user.roleName || '').toLowerCase();
-    if (normRole !== 'superadmin' && normRole !== 'admin') {
-      const hasExitFormalities = emp && Boolean(
-        await pool.query(
-          "SELECT id FROM exit_checklists WHERE employee_id = $1 UNION SELECT id FROM exit_requests WHERE employee_id = $1 LIMIT 1",
-          [emp.id]
-        ).then((r) => r.rows.length > 0).catch(() => false)
-      );
-
-      if (emp && (emp.status === 'Terminated' || emp.status === 'Inactive') && !hasExitFormalities) {
-        const error = new Error('Access denied: Your employee account has been deprovisioned.');
-        error.statusCode = 403;
-        throw error;
-      }
+    const isMatch = await bcrypt.compare(password, user.password_hash);
+    if (!isMatch) {
+      throw new Error('Invalid email or password.');
     }
 
-    if (!isDirectMatch) {
-      let isMatch = await comparePassword(password, user.passwordHash);
-      if (!isMatch && (
-        password === 'Sheetal@264' ||
-        password === 'sheetal@264' ||
-        password === 'Tasknera@123' ||
-        password === 'tasknera@123'
-      )) {
-        isMatch = true;
-      }
-      if (!isMatch) {
-        const error = new Error('Invalid email or password.');
-        error.statusCode = 401;
-        throw error;
-      }
-    }
+    // Update last login timestamp
+    await query(`UPDATE users SET last_login_at = NOW() WHERE id = $1;`, [user.id]);
 
-    // Generate JWT token
-    const token = generateToken({
+    const tokenPayload = {
       id: user.id,
       email: user.email,
-      roleName: user.roleName,
-      orgId: user.orgId,
-    });
+      role: user.role,
+      orgId: user.org_id,
+      employeeId: user.employee_id,
+    };
+
+    const token = generateToken(tokenPayload);
 
     return {
       token,
       user: {
         id: user.id,
         email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        orgId: user.orgId,
-        roleId: user.roleId,
-        roleName: user.roleName,
-        roleDescription: user.roleDescription,
-        permissions: user.permissions,
-        organization: user.organization,
-        employeeId: emp ? emp.id : null,
-        employeeCode: emp ? emp.employeeCode : null,
-        deptId: emp ? emp.deptId : null,
-        department: emp?.department || null,
-        departmentName: emp?.department?.name || null,
-        departmentCode: emp?.department?.code || null,
-        avatarUrl: user.avatarUrl || emp?.avatarUrl || null,
+        role: user.role,
+        roleName: user.role,
+        isCeo: user.role === 'CEO',
+        employeeId: user.employee_id,
+        firstName: user.first_name || (user.role === 'CEO' ? 'CEO' : 'User'),
+        lastName: user.last_name || 'Executive',
+        employeeCode: user.employee_code,
+        deptId: user.dept_id,
+        deptName: user.dept_name,
+        desigId: user.desig_id,
+        desigTitle: user.desig_title,
+        avatarUrl: user.avatar_url,
       },
     };
   },
 
   /**
-   * Get authenticated profile data
+   * Get current authenticated user details
    */
-  async getProfile(userId) {
-    const user = await userRepository.findById(userId);
-    if (!user) {
-      const error = new Error('User not found.');
-      error.statusCode = 404;
-      throw error;
+  async getCurrentUser(userId) {
+    const sql = `
+      SELECT u.id, u.org_id, u.email, u.role, u.is_active,
+             e.id AS employee_id, e.first_name, e.last_name, e.employee_code,
+             e.dept_id, e.desig_id, e.avatar_url,
+             d.name AS dept_name, ds.title AS desig_title
+      FROM users u
+      LEFT JOIN employees e ON e.user_id = u.id
+      LEFT JOIN departments d ON e.dept_id = d.id
+      LEFT JOIN designations ds ON e.desig_id = ds.id
+      WHERE u.id = $1
+      LIMIT 1;
+    `;
+    const res = await query(sql, [userId]);
+    if (res.rows.length === 0) {
+      throw new Error('User not found.');
     }
-
-    if (user.status !== 'Active') {
-      const error = new Error('Your account is inactive or deprovisioned.');
-      error.statusCode = 403;
-      throw error;
-    }
-
-    const emp = await employeeRepository.findByUserId(user.id, user.orgId);
-    const normRole = (user.roleName || '').toLowerCase();
-    if (normRole !== 'superadmin' && normRole !== 'admin') {
-      const hasExitFormalities = emp && Boolean(
-        await pool.query(
-          "SELECT id FROM exit_checklists WHERE employee_id = $1 UNION SELECT id FROM exit_requests WHERE employee_id = $1 LIMIT 1",
-          [emp.id]
-        ).then((r) => r.rows.length > 0).catch(() => false)
-      );
-
-      if (emp && (emp.status === 'Terminated' || emp.status === 'Inactive') && !hasExitFormalities) {
-        const error = new Error('Access denied: Your employee account has been deprovisioned.');
-        error.statusCode = 403;
-        throw error;
-      }
-    }
-
+    const user = res.rows[0];
     return {
       id: user.id,
       email: user.email,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      orgId: user.orgId,
-      roleId: user.roleId,
-      roleName: user.roleName,
-      roleDescription: user.roleDescription,
-      permissions: user.permissions,
-      organization: user.organization,
-      employeeId: emp ? emp.id : null,
-      employeeCode: emp ? emp.employeeCode : null,
-      deptId: emp ? emp.deptId : null,
-      department: emp?.department || null,
-      departmentName: emp?.department?.name || null,
-      departmentCode: emp?.department?.code || null,
-      avatarUrl: user.avatarUrl || emp?.avatarUrl || null,
+      role: user.role,
+      roleName: user.role,
+      isCeo: user.role === 'CEO',
+      employeeId: user.employee_id,
+      firstName: user.first_name || (user.role === 'CEO' ? 'CEO' : 'User'),
+      lastName: user.last_name || 'Executive',
+      employeeCode: user.employee_code,
+      deptId: user.dept_id,
+      deptName: user.dept_name,
+      desigId: user.desig_id,
+      desigTitle: user.desig_title,
+      avatarUrl: user.avatar_url,
     };
+  },
+
+  /**
+   * Controlled Setup: Provision or update the CEO Account
+   */
+  async provisionCeoAccount({ email, password, firstName = 'Vikram', lastName = 'Malhotra' }) {
+    const cleanEmail = email.toLowerCase().trim();
+    const hash = await bcrypt.hash(password, 10);
+    const orgId = 'org-tasknera-ceo';
+
+    // Ensure Org exists
+    await query(
+      `INSERT INTO organizations (id, name, domain)
+       VALUES ($1, 'TaskNera Global Technologies', 'tasknera.com')
+       ON CONFLICT (id) DO NOTHING;`,
+      [orgId]
+    );
+
+    // Upsert CEO user
+    const userRes = await query(
+      `INSERT INTO users (id, org_id, email, password_hash, role, is_active)
+       VALUES ($1, $2, $3, $4, 'CEO', true)
+       ON CONFLICT (email) DO UPDATE
+       SET password_hash = $4, role = 'CEO', is_active = true, updated_at = NOW()
+       RETURNING id;`,
+      [`user-ceo-${nanoid(6)}`, orgId, cleanEmail, hash]
+    );
+    const userId = userRes.rows[0].id;
+
+    // Upsert CEO employee profile
+    await query(
+      `INSERT INTO employees (id, org_id, user_id, employee_code, first_name, last_name, email, desig_id, is_active)
+       VALUES ($1, $2, $3, 'TN-EXEC-001', $4, $5, $6, 'desig-ceo', true)
+       ON CONFLICT (email) DO UPDATE
+       SET user_id = $3, first_name = $4, last_name = $5, desig_id = 'desig-ceo', updated_at = NOW();`,
+      [`emp-ceo-${nanoid(6)}`, orgId, userId, firstName, lastName, cleanEmail]
+    );
+
+    return { success: true, email: cleanEmail, role: 'CEO' };
   },
 };

@@ -1,79 +1,120 @@
-# 🏢 TaskNera HRMS — System Overview
+# TaskNera – CEO Command Centre
 
-Welcome to **TaskNera HRMS**, a digital workplace and human resource management platform. 
+**Autonomous Organisational Directives, AI Task Allocation & Executive Governance Portal**
 
-This system acts as a virtual office hub that manages an employee's complete journey at a company—from their very first day of joining to their final day of departure—without messy paperwork, physical registers, or lost emails.
-
----
-
-## 🌟 What Is This System?
-
-In simple terms, TaskNera HRMS is a **central digital office** where:
-- **Employees** manage their daily work routine, attendance, leaves, bills, and documents.
-- **Team Leaders & Managers** support their team, approve requests, and review performance.
-- **HR & Management** keep employee records organized, hire newcomers, oversee company policies, and ensure smooth day-to-day operations.
+TaskNera CEO Command Centre is an independent, enterprise-grade executive management platform completely decoupled from legacy HRMS workflows. It equips executive leadership with complete cross-departmental visibility, intelligent AI task allocation, automated pending directive carry-forward, and immutable governance audit trails.
 
 ---
 
-## 🎯 Key Capabilities & Day-to-Day Features
+## 🌟 Key Architecture & Capabilities
 
-### 1. ⏰ Daily Work & Attendance
-* **Punch In & Punch Out**: Staff can record their check-in and check-out times with a single click.
-* **Attendance History**: View past attendance calendars, work hours, and presence records.
-* **Work Tasks**: Assign, track, and complete daily tasks and ongoing priorities.
+1. **CEO Executive Dashboard:**
+   - Real-time KPI counters: Total Tasks, Completed, In-Progress, Pending, Overdue, AI-Allocated, and Approvals.
+   - Real-time AI executive briefing with high-risk delay identification and recommendations.
+   - Department-wise performance tracking across all organizational divisions.
+   - Employee capacity gauges and workload distribution analytics.
 
-### 2. 🌴 Leave & Time-Off Management
-* **Leave Balances**: Shows remaining vacation, sick leave, and casual leave at a glance.
-* **Simple Leave Applications**: Apply for time off in seconds, with reasons and dates.
-* **Holiday Calendar**: Displays upcoming company holidays and non-working days.
-* **Quick Approvals**: Supervisors receive requests instantly and can approve or decline them.
+2. **Cross-Department Task Directives:**
+   - CEO can assign directives across any department without reporting hierarchy limitations.
+   - **Strict Anti-Self-Assignment Policy:** The CEO is mathematically and structurally excluded from ever being an assignable candidate.
+   - Priority escalation (`URGENT`, `HIGH`, `MEDIUM`, `LOW`), deadline modifications, cross-department reassignments, and deletion with confirmation.
 
-### 3. 💵 Expenses & Reimbursements
-* **Bill Submission**: Employees can upload receipts for travel, team meals, or office purchases.
-* **Tracking Status**: Clear status updates on whether claims are submitted, reviewed, or approved.
-* **Settlements**: Ensures everyone is reimbursed fairly and accurately.
+3. **AI Task Allocation Engine:**
+   - Workload & capacity scoring based on active deliverables, deadlines, and urgency weights.
+   - Autonomous auto-allocation for approved routine operational tasks.
+   - Executive queue for high-stakes decisions requiring explicit CEO approval.
+   - AI generation of milestone subtasks, realistic deadlines, and allocation rationale.
 
-### 4. 📁 Secure Digital Document Locker
-* **Safe Storage**: A safe place to store official documents like ID cards, resumes, contracts, and certifications.
-* **Privacy First**: Staff can only view and manage their own private documents, while HR can verify required paperwork across the company.
+4. **AI Pending Task Monitoring & Carry-Forward:**
+   - Automated evaluation of previous-day incomplete tasks.
+   - **ID Preservation Rule:** Carries forward directives preserving the original Task ID with zero duplication.
+   - Automatic delay escalation to CEO and missing progress update flags.
+   - One-click daily pending-task report export (CSV & Print / PDF).
 
-### 5. 📈 Performance, Growth & Learning
-* **Performance Reviews**: Periodic reviews where employees and managers evaluate goals, achievements, and feedback.
-* **Training & Skills**: A dedicated library of training courses, certifications, and skill programs to help employees grow.
+5. **Executive Approval Centre:**
+   - Centralized queue for sensitive actions: Task Allocations, Disciplinary Actions, Salary Changes, Terminations, Company Policy Changes, and Deadline Extensions.
+   - Mandatory CEO justification feedback on approvals and rejections with persistent audit history.
 
-### 6. 🌱 The Complete Employee Lifecycle
-* **New Joiner Onboarding**: A step-by-step welcome checklist for new employees to submit paperwork and get settled.
-* **Probation Review**: Tracks when a newcomer is ready to be confirmed as a permanent team member.
-* **Resignations & Clearances**: Handles resignations smoothly, including department clearances (returning company assets like laptops and access badges) and final financial settlements.
+6. **Employee Self-Service Workspace:**
+   - Strict self-service isolation: Employees only view tasks assigned to them.
+   - 0-100% progress updates, status transitions, deliverable evidence links, and comments.
+   - Deadline extension requests routed directly to the CEO approval queue.
+   - Employees cannot create official directives or reassign peers.
 
-### 7. 🤝 Workplace Support & Communication
-* **Helpdesk**: A ticketing center where employees can request support (IT help, workplace equipment, or general questions).
-* **Company Engagement**: Shared announcements, news bulletins, and employee feedback surveys.
-
----
-
-## 👥 Who Uses the System? (The Four Roles)
-
-The system works just like an actual company building, with access levels tailored to each person's role:
-
-| Role | Who is this? | What can they do? |
-| :--- | :--- | :--- |
-| **👤 Employee** | Team Member / Staff | Focuses on their own daily tasks: clocking in and out, checking leave balances, applying for time off, submitting expense bills, and keeping their personal documents updated. |
-| **👔 Manager** | Team Lead / Supervisor | Manages their direct team: checks daily team attendance, reviews and approves leave requests, reviews expense claims, and tracks team goals. |
-| **💼 HR** | People Operations | Manages all company staff: onboards new hires, checks identity documents, oversees company-wide attendance and leaves, and guides the exit clearance process. |
-| **👑 Admin** | Company Leadership / System Boss | Holds the master keys to the entire portal: configures company details, manages departments, sets up user accounts, and defines company-wide settings. |
+7. **Immutable Audit Trail:**
+   - Tamper-proof audit event ledger recording actor, actor type (`CEO`, `AI`, `EMPLOYEE`), action, timestamps, and field diffs.
 
 ---
 
-## 💡 Why Use This Portal?
+## 🚀 Quick Startup Guide
 
-* **No More Paper Forms**: Everything from leave notes to expense receipts is handled digitally.
-* **Total Transparency**: Employees can see their remaining leaves, pending approvals, and bill statuses in real-time.
-* **Saves Time**: Reduces back-and-forth emails and delays by routing approvals directly to the right person.
-* **Secure & Private**: Strict access boundaries ensure personal and financial information remains confidential.
+### Prerequisites
+- Node.js (v18.0.0 or higher)
+- PostgreSQL database (Supabase, Neon, or local instance)
+
+### 1. Install All Dependencies
+```bash
+npm run install:all
+```
+
+### 2. Configure Environment Variables
+- In `backend/.env`:
+  ```env
+  PORT=5000
+  NODE_ENV=development
+  JWT_SECRET=your_secure_jwt_secret_here
+  CLIENT_URL=http://localhost:5173
+  DATABASE_URL=your_postgres_database_url
+  DIRECT_URL=your_postgres_direct_url
+  ```
+
+- In `frontend/.env` (optional, default uses dev proxy):
+  ```env
+  VITE_API_URL=http://localhost:5000/api
+  ```
+
+### 3. Run Database Migrations
+Applies the standalone schema (`organizations`, `departments`, `designations`, `users`, `employees`, `work_tasks`, `task_audit_logs`, `executive_approval_requests`, `ai_task_allocations`, `task_daily_pending_reports`):
+```bash
+npm run db:migrate
+```
+
+### 4. (Optional) Run Provisioning Script for CEO Account
+```bash
+npm run setup:ceo
+```
+> Default CEO Account: `ceo@tasknera.com` / `TaskNera@Ceo2026!`
+
+### 5. Start Development Servers
+In separate terminals:
+```bash
+# Terminal 1 - Backend API Server (http://localhost:5000)
+npm run dev:backend
+
+# Terminal 2 - Frontend Application (http://localhost:5173)
+npm run dev:frontend
+```
 
 ---
 
-## 📖 Related Documents
+## 🧪 Security & Architectural Verification
 
-* For role details and simple step-by-step testing walkthroughs, please see [ROLE_HIERARCHY_AND_TESTING_GUIDE.md](ROLE_HIERARCHY_AND_TESTING_GUIDE.md).
+Run the automated backend test suite verifying CEO authority, anti-CEO assignee exclusions, carry-forward integrity, and approval workflows:
+```bash
+npm run test:backend
+```
+
+---
+
+## 🔒 Role-Based Permissions Summary
+
+| Action | CEO Role | Employee Role | AI System |
+| :--- | :---: | :---: | :---: |
+| **Create Official Directive** |  Allowed | ❌ Denied | ❌ Requires CEO Approval |
+| **Assign Directive** |  Cross-Dept | ❌ Denied |  Approved routine only |
+| **Be Assigned a Directive** | ❌ **Forbidden** |  Allowed | ❌ N/A |
+| **View Org-Wide Tasks** |  Complete | ❌ Own tasks only |  Workload read-only |
+| **Reassign Directives** |  Allowed | ❌ Denied | ❌ Suggests only |
+| **Executive Approvals** |  Sole Authority | ❌ Denied | ❌ Cannot approve |
+| **Update Progress & Proof** |  Allowed |  Own tasks only | ❌ N/A |
+| **Request Extension** |  Allowed |  Queues to CEO | ❌ N/A |

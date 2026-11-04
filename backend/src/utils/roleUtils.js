@@ -1,71 +1,8 @@
 import { query } from '../config/db.js';
 
 /**
- * Checks whether an employee object or employee database record represents the CEO or Admin.
- * Identifies the CEO/Admin via existing role structure ('Admin', 'SuperAdmin', 'OrgAdmin')
- * or CEO designation ('desig-ceo', title 'CEO', code 'CEO') WITHOUT hardcoding personal names.
- *
- * @param {Object} emp - Employee domain object or row
- * @returns {boolean}
- */
-export const isCeoOrAdmin = (emp) => {
-  if (!emp) return false;
-
-  // 1. Role check (direct or nested)
-  const role = (
-    emp.user?.roleName ||
-    emp.roleName ||
-    emp.role_name ||
-    emp.role?.name ||
-    (typeof emp.role === 'string' ? emp.role : '') ||
-    ''
-  ).toLowerCase().trim();
-
-  if (['admin', 'superadmin', 'orgadmin'].some((r) => role.includes(r))) {
-    return true;
-  }
-
-  // 2. Designation check (ID, Code, Title)
-  const desigId = emp.desigId || emp.desig_id || emp.designation?.id;
-  if (desigId === 'desig-ceo') {
-    return true;
-  }
-
-  const desigCode = (
-    emp.designationCode ||
-    emp.designation?.code ||
-    emp.desigCode ||
-    emp.desig_code ||
-    ''
-  ).toUpperCase().trim();
-  if (desigCode === 'CEO') {
-    return true;
-  }
-
-  const desigTitle = (
-    emp.designationTitle ||
-    emp.designation?.title ||
-    emp.designationName ||
-    emp.designation_title ||
-    (typeof emp.designation === 'string' ? emp.designation : '') ||
-    ''
-  ).toLowerCase().trim();
-  if (desigTitle === 'ceo' || desigTitle.includes('chief executive officer')) {
-    return true;
-  }
-
-  // 3. Department check
-  const deptCode = (emp.department?.code || emp.dept_code || '').toUpperCase().trim();
-  const deptId = emp.deptId || emp.dept_id;
-  if ((deptId === 'dept-main' || deptCode === 'MAIN') && (desigTitle === 'ceo' || desigId === 'desig-ceo')) {
-    return true;
-  }
-
-  return false;
-};
-
-/**
- * Database-level verification to check if an employee ID belongs to the CEO or an Admin.
+ * Checks whether an employee ID represents the CEO.
+ * Enforces the strict rule: The CEO must NEVER be an eligible task assignee.
  *
  * @param {string} employeeId
  * @param {string} [orgId]
@@ -76,12 +13,9 @@ export const checkIsEmployeeCeoOrAdmin = async (employeeId, orgId = null) => {
 
   try {
     const sql = `
-      SELECT e.id, e.desig_id, e.dept_id,
-             r.name AS role_name,
-             ds.title AS desig_title, ds.code AS desig_code
+      SELECT e.id, e.desig_id, u.role
       FROM employees e
       LEFT JOIN users u ON u.id = e.user_id
-      LEFT JOIN roles r ON r.id = u.role_id
       LEFT JOIN designations ds ON ds.id = e.desig_id
       WHERE e.id = $1 ${orgId ? 'AND e.org_id = $2' : ''}
       LIMIT 1;
@@ -91,11 +25,9 @@ export const checkIsEmployeeCeoOrAdmin = async (employeeId, orgId = null) => {
     if (res.rows.length === 0) return false;
 
     const row = res.rows[0];
-    const roleName = (row.role_name || '').toLowerCase().trim();
-    if (['admin', 'superadmin', 'orgadmin'].some((r) => roleName.includes(r))) return true;
+    const role = (row.role || '').toUpperCase().trim();
+    if (role === 'CEO') return true;
     if (row.desig_id === 'desig-ceo') return true;
-    if ((row.desig_code || '').toUpperCase().trim() === 'CEO') return true;
-    if ((row.desig_title || '').toLowerCase().trim() === 'ceo') return true;
 
     return false;
   } catch (err) {
@@ -105,24 +37,24 @@ export const checkIsEmployeeCeoOrAdmin = async (employeeId, orgId = null) => {
 };
 
 /**
- * SQL condition generator to exclude the CEO / Administrator from employee queries (such as attendance, headcount, reports).
- *
- * @param {string} [employeeAlias='e'] - Table alias for employees table
- * @returns {string}
+ * Synchronous check on a user/employee object
  */
-export const getCeoAdminExclusionSql = (employeeAlias = 'e') => `
+export const isCeoOrAdmin = (empOrUser) => {
+  if (!empOrUser) return false;
+  const role = (empOrUser.role || empOrUser.roleName || empOrUser.user?.role || '').toUpperCase().trim();
+  const desig = (empOrUser.desigId || empOrUser.desig_id || empOrUser.designation?.id || '').toLowerCase().trim();
+  const email = (empOrUser.email || '').toLowerCase().trim();
+  return role === 'CEO' || desig === 'desig-ceo' || email === 'ceo@tasknera.com';
+};
+
+/**
+ * Exclude CEO from SQL assignee selection
+ */
+export const getCeoAdminExclusionSql = (alias = 'e') => `
   NOT (
-    ${employeeAlias}.desig_id = 'desig-ceo'
+    ${alias}.desig_id = 'desig-ceo'
     OR EXISTS (
-      SELECT 1 FROM designations ds 
-      WHERE ds.id = ${employeeAlias}.desig_id 
-        AND (ds.id = 'desig-ceo' OR UPPER(COALESCE(ds.code, '')) = 'CEO' OR LOWER(COALESCE(ds.title, '')) LIKE '%ceo%' OR LOWER(COALESCE(ds.title, '')) LIKE '%chief executive officer%')
-    )
-    OR EXISTS (
-      SELECT 1 FROM users u 
-      JOIN roles r ON r.id = u.role_id 
-      WHERE u.id = ${employeeAlias}.user_id 
-        AND LOWER(COALESCE(r.name, '')) IN ('admin', 'superadmin', 'orgadmin')
+      SELECT 1 FROM users u WHERE u.id = ${alias}.user_id AND u.role = 'CEO'
     )
   )
 `;
@@ -130,63 +62,9 @@ export const getCeoAdminExclusionSql = (employeeAlias = 'e') => `
 export const CEO_ADMIN_EXCLUSION_SQL = getCeoAdminExclusionSql('e');
 
 /**
- * Checks whether an employee or user belongs to the Learning & Development (L&D / LND) Department
- * or has an L&D related role/designation.
- *
- * @param {Object} userOrEmp
- * @returns {boolean}
+ * Filters out CEO from an array of employee objects
  */
-export const isLdDepartmentUser = (userOrEmp) => {
-  if (!userOrEmp) return false;
-
-  const role = (
-    userOrEmp.roleName ||
-    userOrEmp.role_name ||
-    userOrEmp.role?.name ||
-    userOrEmp.user?.roleName ||
-    userOrEmp.user?.role?.name ||
-    (typeof userOrEmp.role === 'string' ? userOrEmp.role : '') ||
-    ''
-  ).toLowerCase().trim();
-
-  if (
-    role.includes('ld') ||
-    role.includes('l&d') ||
-    role.includes('lnd') ||
-    role.includes('learning') ||
-    role.includes('trainer') ||
-    role.includes('training')
-  ) {
-    return true;
-  }
-
-  const deptName = (
-    userOrEmp.departmentName ||
-    userOrEmp.department?.name ||
-    userOrEmp.deptName ||
-    (typeof userOrEmp.department === 'string' ? userOrEmp.department : '') ||
-    ''
-  ).toLowerCase().trim();
-
-  const deptCode = (
-    userOrEmp.departmentCode ||
-    userOrEmp.department?.code ||
-    userOrEmp.deptCode ||
-    ''
-  ).toLowerCase().trim();
-
-  const deptId = (userOrEmp.deptId || userOrEmp.dept_id || '').toLowerCase().trim();
-
-  return (
-    deptName === 'learning & development' ||
-    deptName === 'learning and development' ||
-    deptName.includes('learning') ||
-    deptName.includes('l&d') ||
-    deptName.includes('lnd') ||
-    deptCode === 'l&d' ||
-    deptCode === 'ld' ||
-    deptCode === 'lnd' ||
-    deptId === 'dept-ld'
-  );
+export const filterNonCeoEmployees = (employees = []) => {
+  if (!Array.isArray(employees)) return [];
+  return employees.filter((emp) => !isCeoOrAdmin(emp));
 };
-

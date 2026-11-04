@@ -1,23 +1,18 @@
 {
-  "name": "hrms-backend",
+  "name": "tasknera-ceo-command-centre-backend",
   "version": "1.0.0",
-  "description": "HRMS Portal Backend API Server",
+  "description": "TaskNera CEO Command Centre & AI Allocation Backend",
   "main": "src/server.js",
   "type": "module",
   "scripts": {
-    "build": "echo 'Backend build step complete'",
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
     "db:migrate": "node src/migrations/migrate.js",
-    "db:seed": "node src/seeds/seed.js",
-    "db:clean": "node src/scripts/clean_dummy_data.js",
-    "db:clean:dry": "node src/scripts/clean_dummy_data.js --dry-run",
-    "sync:cloudinary": "node src/scripts/sync_pdfs_to_cloudinary.js",
-    "test": "node tests/appsumoLicensing.test.js && node tests/hrShiftAndAttendancePermissions.test.js && node tests/workdayPermissions.test.js && node tests/exitChecklistPermissions.test.js && node tests/overtimeAndAutoLogout.test.js && node tests/rosterParserAndSync.test.js && node tests/splitShiftAttendance.test.js && node tests/nineHourShiftAutoLogout.test.js && node tests/attendanceCalculation.test.js && node tests/aiRosterAutomation.test.js && node tests/attendanceAuditE2E.test.js"
+    "setup:ceo": "node src/scripts/setupCeo.js",
+    "test": "node tests/ceoCommandCentre.test.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
-    "cloudinary": "^2.11.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
@@ -26,8 +21,7 @@
     "morgan": "^1.10.0",
     "multer": "^2.4.0",
     "nanoid": "^6.0.2",
-    "pg": "^8.23.0",
-    "xlsx": "^0.18.5"
+    "pg": "^8.23.0"
   },
   "devDependencies": {
     "nodemon": "^3.1.9"

@@ -1,20 +1,18 @@
 import { Router } from 'express';
 import { taskController } from '../controllers/taskController.js';
 import { authenticate } from '../middleware/authMiddleware.js';
-import { authorize } from '../middleware/rbacMiddleware.js';
 
 const router = Router();
 
 router.use(authenticate);
 
-router.get('/', authorize(['task:read', 'employee:read']), taskController.list);
-router.get('/performance', authorize(['task:read', 'employee:read']), taskController.getMyPerformance);
-router.post('/', authorize(['task:write', 'employee:read']), taskController.create);
-router.patch('/:id/status', authorize(['task:write', 'employee:read']), taskController.updateStatus);
-router.post('/:id/comments', authorize(['task:write', 'employee:read']), taskController.addComment);
-router.patch('/:id/subtasks', authorize(['task:write', 'employee:read']), taskController.updateSubtasks);
-router.patch('/:id/rate', authorize(['task:write', 'employee:read']), taskController.rate);
-router.patch('/:id/reopen', authorize(['task:write', 'employee:read']), taskController.reopen);
+// Employee Scoped Task Operations
+router.get('/', taskController.listMyTasks);
+router.get('/mine', taskController.listMyTasks);
+router.put('/:id/progress', taskController.updateProgress);
+router.post('/:id/request-extension', taskController.requestExtension);
+router.post('/:id/comments', taskController.addComment);
+router.patch('/:id/subtasks', taskController.updateSubtasks);
+router.get('/:id/audit-trail', taskController.getAuditTrail);
 
 export default router;
-

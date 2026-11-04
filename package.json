@@ -1,23 +1,25 @@
 {
-  "name": "hrms-portal",
-  "version": "1.0.0",
-  "description": "HRMS Portal - Employee and Organization Management System",
+  "name": "tasknera-ceo-command-centre",
+  "version": "2.0.0",
+  "description": "TaskNera CEO Command Centre & Autonomous AI Task Allocation Portal",
   "private": true,
   "scripts": {
     "install:all": "npm --prefix backend install && npm --prefix frontend install",
     "dev:backend": "npm --prefix backend run dev",
     "dev:frontend": "npm --prefix frontend run dev",
     "build": "npm --prefix frontend run build",
-    "build:frontend": "npm --prefix frontend run build",
-    "start": "npm --prefix backend run start",
-    "start:backend": "npm --prefix backend run start"
+    "test:backend": "npm --prefix backend run test",
+    "db:migrate": "npm --prefix backend run db:migrate",
+    "setup:ceo": "npm --prefix backend run setup:ceo",
+    "start": "npm --prefix backend run start"
   },
   "keywords": [
-    "hrms",
-    "employee-management",
-    "organization-management",
-    "rbac"
+    "tasknera",
+    "ceo-command-centre",
+    "ai-task-allocation",
+    "executive-approvals",
+    "audit-trail"
   ],
-  "author": "Shubham,Ajay and Sakshi",
+  "author": "TaskNera Engineering",
   "license": "MIT"
 }
