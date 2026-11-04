@@ -140,6 +140,26 @@ export const ceoTaskController = {
     }
   },
 
+  async generateRoleTasks(req, res, next) {
+    try {
+      const orgId = req.user.orgId || 'org-tasknera-ceo';
+      const data = await aiTaskAllocationService.generateRoleBasedTasks(orgId);
+      return sendSuccess(res, 'Role-based operational tasks generated successfully.', data);
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async getRoleTaskCatalog(req, res, next) {
+    try {
+      const orgId = req.user.orgId || 'org-tasknera-ceo';
+      const data = await aiTaskAllocationService.getRoleTaskCatalog(orgId);
+      return sendSuccess(res, 'Role task catalog retrieved.', data);
+    } catch (error) {
+      next(error);
+    }
+  },
+
   async actOnAiAllocation(req, res, next) {
     try {
       const { id } = req.params;

@@ -117,7 +117,28 @@ export const ceoTaskService = {
     try {
       const res = await http.get('/v1/ceo/tasks/ai-allocations', { params });
       return res.data || res;
+    } catch (e) {
+      console.warn('getAiAllocations error:', e);
+      return [];
+    }
+  },
+
+  async generateRoleTasks() {
+    const res = await http.post('/v1/ceo/tasks/generate-role-tasks');
+    return res.data || res;
+  },
+
+  async getRoleTaskCatalog() {
+    try {
+      const res = await http.get('/v1/ceo/tasks/role-task-catalog');
+      return res.data || res;
     } catch {
+      return [];
+    }
+  },
+
+  async _legacyFallback(params = {}) {
+    try {
       return [
         {
           id: 'ai-alloc-1',
@@ -193,6 +214,8 @@ export const ceoTaskService = {
           createdAt: new Date().toISOString(),
         },
       ];
+    } catch {
+      return [];
     }
   },
 

@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { ShieldCheck, Plus, Trash2, AlertCircle, Sparkles, Bot } from 'lucide-react';
+import { ShieldCheck, Plus, Trash2, AlertCircle, Sparkles, Bot, Layers, CheckSquare } from 'lucide-react';
 import { Modal } from '../common/Modal.jsx';
 import { Button } from '../common/Button.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { employeeService } from '../../services/employeeService.js';
+import { ceoTaskService } from '../../services/ceoTaskService.js';
 import { filterNonCeoEmployees } from '../../utils/roleUtils.js';
 
 export const CeoTaskCreateModal = ({
@@ -18,6 +19,8 @@ export const CeoTaskCreateModal = ({
   // Self-fetch employees & departments if the parent hasn't passed them yet
   const [localEmployees, setLocalEmployees] = useState([]);
   const [localDepartments, setLocalDepartments] = useState([]);
+  const [sopCatalog, setSopCatalog] = useState([]);
+  const [selectedSopCode, setSelectedSopCode] = useState('');
   const [fetchError, setFetchError] = useState('');
 
   useEffect(() => {
@@ -25,9 +28,10 @@ export const CeoTaskCreateModal = ({
 
     const loadData = async () => {
       try {
-        const [empRes, deptRes] = await Promise.allSettled([
+        const [empRes, deptRes, catalogRes] = await Promise.allSettled([
           employeeService.listEmployees({ excludeCeo: true }),
           employeeService.listDepartments(),
+          ceoTaskService.getRoleTaskCatalog(),
         ]);
 
         if (empRes.status === 'fulfilled') {
@@ -45,6 +49,15 @@ export const CeoTaskCreateModal = ({
             ? deptRes.value
             : [];
           setLocalDepartments(rawDepts);
+        }
+
+        if (catalogRes.status === 'fulfilled') {
+          const rawCatalog = Array.isArray(catalogRes.value?.data)
+            ? catalogRes.value.data
+            : Array.isArray(catalogRes.value)
+            ? catalogRes.value
+            : [];
+          setSopCatalog(rawCatalog);
         }
       } catch (err) {
         console.warn('CeoTaskCreateModal: failed to self-fetch data', err);
@@ -93,11 +106,33 @@ export const CeoTaskCreateModal = ({
         priority: 'HIGH',
         dueDate: '',
       });
+      setSelectedSopCode('');
       setSubtasks(['']);
       setError('');
       setFetchError('');
     }
   }, [isOpen]);
+
+  // Handle selecting an item from the SOP catalog
+  const handleSelectSopBlueprint = (sopCode) => {
+    setSelectedSopCode(sopCode);
+    if (!sopCode) return;
+
+    const blueprint = sopCatalog.find((b) => (b.sopCode || b.title) === sopCode);
+    if (!blueprint) return;
+
+    setFormData((prev) => ({
+      ...prev,
+      title: blueprint.title,
+      description: blueprint.description,
+      deptId: blueprint.deptId || prev.deptId,
+      priority: blueprint.priority || 'HIGH',
+    }));
+
+    if (Array.isArray(blueprint.subtasks) && blueprint.subtasks.length > 0) {
+      setSubtasks(blueprint.subtasks);
+    }
+  };
 
   // Department-filtered staff pool
   const filteredAssignees = nonCeoStaff.filter((emp) => {
@@ -122,7 +157,7 @@ export const CeoTaskCreateModal = ({
     setError('');
 
     if (!formData.title.trim()) {
-      setError('Please provide a directive title.');
+      setError('Please provide a directive title or pick an SOP task.');
       return;
     }
 
@@ -133,7 +168,7 @@ export const CeoTaskCreateModal = ({
         .filter(Boolean)
         .map((title, idx) => ({ id: `sub-${Date.now()}-${idx}`, title, completed: false }));
 
-      // If user left assignee blank, it triggers AI Auto-Allocation
+      // If user left assignee blank, it triggers AI Auto-Allocation to 1 department member
       await onSubmit({
         ...formData,
         assigneeId: formData.assigneeId || 'AUTO',
@@ -162,7 +197,7 @@ export const CeoTaskCreateModal = ({
       isOpen={isOpen}
       onClose={onClose}
       title="Create Organizational Task Directive"
-      subtitle="AI will observe task scope and automatically assign the optimal team member"
+      subtitle="Select a pre-configured SOP directive or specify your directive requirements"
       maxWidth="max-w-2xl"
     >
       <form onSubmit={handleSubmit} className="p-6 space-y-4">
@@ -171,8 +206,7 @@ export const CeoTaskCreateModal = ({
           <div className="flex items-center gap-2.5 p-3 rounded-xl bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-900/60 text-purple-900 dark:text-purple-200 text-xs">
             <Bot className="w-5 h-5 text-purple-600 dark:text-purple-400 shrink-0" />
             <span>
-              <strong>AI Auto-Allocation Active:</strong> Simply specify your task directive and description.
-              The AI engine will observe the requirements, match skills & workload, and automatically assign the best team member.
+              <strong>Role-Based Generation Active:</strong> Pick any pre-configured directive from the SOP catalog below, or define a new directive. The system isolates assignment strictly to 1 team member of the chosen department.
             </span>
           </div>
 
@@ -207,9 +241,29 @@ export const CeoTaskCreateModal = ({
           </div>
         )}
 
+        {/* ── Pre-Configured SOP Catalog Picker ── */}
+        <div className="p-3.5 rounded-xl bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-900/60 space-y-1.5">
+          <label className="block text-xs font-bold text-indigo-950 dark:text-indigo-200 flex items-center gap-1.5">
+            <Layers className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+            ✨ Select from Daily SOP Catalog (Auto-fills title, scope, department & subtasks):
+          </label>
+          <select
+            value={selectedSopCode}
+            onChange={(e) => handleSelectSopBlueprint(e.target.value)}
+            className="w-full px-3 py-2 text-xs font-semibold bg-white dark:bg-slate-900 border border-indigo-300 dark:border-indigo-800 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-2xs"
+          >
+            <option value="">-- Custom Task Directive (or pick from 18 SOP tasks below) --</option>
+            {sopCatalog.map((item) => (
+              <option key={item.sopCode || item.title} value={item.sopCode || item.title}>
+                [{item.deptName || item.deptCode}] {item.sopCode ? `${item.sopCode}: ` : ''}{item.title}
+              </option>
+            ))}
+          </select>
+        </div>
+
         {/* Task Title */}
         <div>
-          <label className="block text-xs font-semibold text-slate-700 mb-1">
+          <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
             Task Title <span className="text-rose-500">*</span>
           </label>
           <input
@@ -218,21 +272,21 @@ export const CeoTaskCreateModal = ({
             value={formData.title}
             onChange={(e) => setFormData({ ...formData, title: e.target.value })}
             placeholder="e.g. Work on new project deployment"
-            className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-lg text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900"
+            className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-800 dark:text-slate-200 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900"
           />
         </div>
 
         {/* Description */}
         <div>
-          <label className="block text-xs font-semibold text-slate-700 mb-1">
+          <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
             Description & Scope
           </label>
           <textarea
             rows="3"
             value={formData.description}
             onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-            placeholder="Describe deliverables, requirements or technical scope. AI uses this to match the most suitable employee..."
-            className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-lg text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900"
+            placeholder="Describe deliverables, requirements or technical scope..."
+            className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-800 dark:text-slate-200 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900"
           />
         </div>
 
@@ -240,8 +294,8 @@ export const CeoTaskCreateModal = ({
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {/* Department Filter */}
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
-              Department <span className="text-slate-400 font-normal">(AI isolates to this department)</span>
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+              Department <span className="text-slate-400 font-normal">(Assignment strictly within department)</span>
             </label>
             <select
               value={formData.deptId}
@@ -253,9 +307,9 @@ export const CeoTaskCreateModal = ({
                   assigneeId: '', // Reset to auto-assign 1 person in the newly selected department
                 }));
               }}
-              className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900"
+              className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900"
             >
-              <option value="">All Departments (AI auto-detects department)</option>
+              <option value="">All Departments (Auto-detect department)</option>
               {activeDepartments.map((dept) => (
                 <option key={dept.id || dept.dept_id} value={dept.id || dept.dept_id}>
                   {dept.name}
@@ -266,10 +320,10 @@ export const CeoTaskCreateModal = ({
 
           {/* Assignee Selection (Strictly 1 Person) */}
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center justify-between">
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1 flex items-center justify-between">
               <span>Assign To (1 Person Only)</span>
               <span className="text-[10px] font-medium text-purple-600 dark:text-purple-400 normal-case flex items-center gap-1">
-                <Sparkles className="w-3 h-3" /> Assigned to 1 person
+                <Sparkles className="w-3 h-3" /> 1 Specialist
               </span>
             </label>
             <select
@@ -282,12 +336,12 @@ export const CeoTaskCreateModal = ({
                   deptId: emp?.dept_id || emp?.deptId || formData.deptId,
                 });
               }}
-              className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900"
+              className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900"
             >
               <option value="">
                 {formData.deptId
                   ? `✨ Auto-Assign 1 person from ${activeDepartments.find((d) => (d.id || d.dept_id) === formData.deptId)?.name || 'this department'} (AI Recommended)`
-                  : '✨ Auto-Assign 1 optimal person (AI selects department & person)'}
+                  : '✨ Auto-Assign 1 optimal person (AI selects department & specialist)'}
               </option>
 
               {/* Group employees by department for optional manual single-person override */}
@@ -331,13 +385,13 @@ export const CeoTaskCreateModal = ({
         {/* 2-column Grid: Priority & Due Date */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
               Priority
             </label>
             <select
               value={formData.priority}
               onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
-              className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900"
+              className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900"
             >
               <option value="URGENT">Urgent (CEO Directive)</option>
               <option value="HIGH">High</option>
@@ -347,15 +401,15 @@ export const CeoTaskCreateModal = ({
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
-              Due Date <span className="text-slate-400 font-normal">(Optional — AI sets default)</span>
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+              Due Date <span className="text-slate-400 font-normal">(Optional — defaults to tomorrow)</span>
             </label>
             <input
               type="date"
               min={new Date().toISOString().split('T')[0]}
               value={formData.dueDate}
               onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
-              className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900"
+              className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900"
             />
           </div>
         </div>
@@ -363,13 +417,13 @@ export const CeoTaskCreateModal = ({
         {/* Subtasks */}
         <div className="space-y-2 pt-2 border-t border-slate-200 dark:border-slate-800">
           <div className="flex items-center justify-between">
-            <label className="block text-xs font-semibold text-slate-700">
-              Subtasks <span className="text-slate-400 font-normal">(Optional — AI generates milestones if empty)</span>
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+              Subtasks & Milestones ({subtasks.filter(Boolean).length} configured)
             </label>
             <button
               type="button"
               onClick={addSubtaskField}
-              className="inline-flex items-center gap-1 text-xs text-slate-700 hover:text-slate-900 font-medium cursor-pointer"
+              className="inline-flex items-center gap-1 text-xs text-slate-700 dark:text-slate-300 hover:text-slate-900 font-medium cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5" /> Add Subtask
             </button>
@@ -384,7 +438,7 @@ export const CeoTaskCreateModal = ({
                   value={st}
                   onChange={(e) => handleSubtaskChange(idx, e.target.value)}
                   placeholder={`Milestone ${idx + 1}...`}
-                  className="flex-1 px-2.5 py-1.5 text-xs bg-white border border-slate-300 rounded-md text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900"
+                  className="flex-1 px-2.5 py-1.5 text-xs bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-md text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900"
                 />
                 {subtasks.length > 1 && (
                   <button
@@ -401,7 +455,7 @@ export const CeoTaskCreateModal = ({
         </div>
 
         {/* Footer Actions */}
-        <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+        <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
           <Button variant="ghost" onClick={onClose} disabled={isSubmitting}>
             Cancel
           </Button>

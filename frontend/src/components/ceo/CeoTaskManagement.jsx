@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
   Plus,
   ShieldCheck,
@@ -10,6 +11,8 @@ import {
   History,
   ArrowRightLeft,
   CheckSquare,
+  ArrowRight,
+  Layers,
 } from 'lucide-react';
 import { Badge } from '../common/Badge.jsx';
 import { Button } from '../common/Button.jsx';
@@ -97,6 +100,34 @@ export const CeoTaskManagement = ({
           <Plus className="w-4 h-4" />
           <span>New Task</span>
         </button>
+      </div>
+
+            {/* SOP Daily Directives Alert & Quick Shortcut */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4 rounded-xl bg-gradient-to-r from-indigo-50 via-purple-50 to-white dark:from-slate-800 dark:to-slate-900 border border-indigo-200/80 dark:border-indigo-900/60 shadow-xs">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-xs shrink-0">
+            <Sparkles className="w-5 h-5 text-amber-300" />
+          </div>
+          <div>
+            <div className="text-xs font-bold text-indigo-950 dark:text-indigo-200 flex items-center gap-2">
+              <span>Tasknera SOP Daily Tasks Available</span>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-200/80 text-indigo-900 dark:bg-indigo-900 dark:text-indigo-200">
+                AI Generated
+              </span>
+            </div>
+            <div className="text-[11px] text-slate-600 dark:text-slate-400 mt-0.5">
+              Standard operating procedures have generated daily operational tasks across all 4 departments. You only need to choose whom to assign.
+            </div>
+          </div>
+        </div>
+
+        <Link
+          to="/ai-allocation"
+          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all shadow-xs shrink-0"
+        >
+          <span>Assign Daily SOP Tasks</span>
+          <ArrowRight className="w-3.5 h-3.5" />
+        </Link>
       </div>
 
       {/* Tasks Table */}
