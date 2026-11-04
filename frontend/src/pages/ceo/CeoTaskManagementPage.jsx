@@ -25,15 +25,30 @@ export const CeoTaskManagementPage = () => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [tasksRes, empRes, deptRes] = await Promise.all([
+      const [tasksRes, empRes, deptRes] = await Promise.allSettled([
         ceoTaskService.listAllTasks(filters),
         employeeService.listEmployees({ excludeCeo: true }),
-        employeeService.listDepartments().catch(() => []),
+        employeeService.listDepartments(),
       ]);
 
-      setTasks(tasksRes.data || (Array.isArray(tasksRes) ? tasksRes : []));
-      setEmployees(filterNonCeoEmployees(empRes.data || empRes.employees || (Array.isArray(empRes) ? empRes : [])));
-      setDepartments(Array.isArray(deptRes.data || deptRes) ? (deptRes.data || deptRes) : []);
+      if (tasksRes.status === 'fulfilled') {
+        const val = tasksRes.value;
+        const tasksList = val?.data || (Array.isArray(val) ? val : []);
+        setTasks(tasksList);
+      }
+
+      if (empRes.status === 'fulfilled') {
+        const val = empRes.value;
+        const rawEmps = val?.data || val?.employees || (Array.isArray(val) ? val : []);
+        const filtered = filterNonCeoEmployees(rawEmps);
+        setEmployees(filtered);
+      }
+
+      if (deptRes.status === 'fulfilled') {
+        const val = deptRes.value;
+        const deptList = Array.isArray(val?.data) ? val.data : (Array.isArray(val) ? val : []);
+        setDepartments(deptList);
+      }
     } catch (err) {
       console.warn('Failed to load task directives:', err);
     } finally {
@@ -45,13 +60,48 @@ export const CeoTaskManagementPage = () => {
     fetchData();
   }, [filters]);
 
+  const handleCreateTask = async (payload) => {
+    await ceoTaskService.createOfficialTask(payload);
+    await fetchData();
+  };
+
+  const handleReassignTask = async (taskId, newAssigneeId, reason) => {
+    await ceoTaskService.reassignTask(taskId, newAssigneeId, reason);
+    await fetchData();
+  };
+
+  const handleModifyDeadline = async (taskId, newDate, reason) => {
+    await ceoTaskService.modifyDeadline(taskId, newDate, reason);
+    await fetchData();
+  };
+
+  const handleChangePriority = async (taskId, priority) => {
+    await ceoTaskService.changePriority(taskId, priority);
+    await fetchData();
+  };
+
+  const handleDeleteTask = async (taskId) => {
+    await ceoTaskService.deleteTask(taskId);
+    await fetchData();
+  };
+
   return (
     <div className="space-y-6">
       <CeoFilterBar
         filters={filters}
-        onFilterChange={setFilters}
+        setFilters={setFilters}
         departments={departments}
         employees={employees}
+        onReset={() =>
+          setFilters({
+            deptId: '',
+            assigneeId: '',
+            status: '',
+            priority: '',
+            origin: '',
+            search: '',
+          })
+        }
       />
 
       {loading ? (
@@ -64,10 +114,14 @@ export const CeoTaskManagementPage = () => {
           employees={employees}
           departments={departments}
           currentUser={user}
+          onCreateTask={handleCreateTask}
+          onReassignTask={handleReassignTask}
+          onModifyDeadline={handleModifyDeadline}
+          onChangePriority={handleChangePriority}
+          onDeleteTask={handleDeleteTask}
           onRefresh={fetchData}
         />
       )}
     </div>
   );
 };
-

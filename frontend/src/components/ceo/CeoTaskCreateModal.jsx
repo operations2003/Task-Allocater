@@ -191,7 +191,7 @@ export const CeoTaskCreateModal = ({
               <option value="">Select Team Member to Execute Directive</option>
               {assignableEmployees.map((emp) => {
                 const name = emp.fullName || `${emp.firstName || emp.first_name || ''} ${emp.lastName || emp.last_name || ''}`.trim() || 'Employee';
-                const desig = emp.designationTitle || emp.designation?.title || emp.departmentName || '';
+                const desig = emp.desig_title || emp.designationTitle || emp.designation?.title || emp.dept_name || emp.departmentName || '';
                 return (
                   <option key={emp.id} value={emp.id}>
                     {name} {desig ? `— ${desig}` : ''}

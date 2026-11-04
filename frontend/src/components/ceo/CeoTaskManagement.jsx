@@ -355,11 +355,15 @@ export const CeoTaskManagement = ({
               className="w-full px-3 py-2 text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500"
             >
               <option value="">Select Target Employee</option>
-              {assignableEmployees.map((emp) => (
-                <option key={emp.id} value={emp.id}>
-                  {emp.fullName || `${emp.firstName || ''} ${emp.lastName || ''}`.trim()} — {emp.departmentName || emp.department || 'Operations'}
-                </option>
-              ))}
+              {assignableEmployees.map((emp) => {
+                const name = emp.fullName || `${emp.firstName || emp.first_name || ''} ${emp.lastName || emp.last_name || ''}`.trim() || emp.name || 'Employee';
+                const role = emp.desig_title || emp.designationTitle || emp.dept_name || emp.departmentName || 'Specialist';
+                return (
+                  <option key={emp.id} value={emp.id}>
+                    {name} — {role}
+                  </option>
+                );
+              })}
             </select>
           </div>
 

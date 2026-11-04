@@ -7,22 +7,25 @@ export const employeeService = {
     if (params.deptId) query.append('deptId', params.deptId);
     if (params.orgId) query.append('orgId', params.orgId);
     if (params.status) query.append('status', params.status);
-    if (params.isEws !== undefined && params.isEws !== '') query.append('isEws', params.isEws);
+    if (params.excludeCeo) query.append('excludeCeo', 'true');
     if (params.page) query.append('page', params.page);
     if (params.limit) query.append('limit', params.limit);
     const queryString = query.toString() ? `?${query.toString()}` : '';
 
     const res = await http.get(`/v1/employees${queryString}`);
-    const raw = res?.data || {};
-    const employees = Array.isArray(raw)
-      ? raw
-      : (Array.isArray(raw.employees) ? raw.employees : (Array.isArray(res) ? res : []));
+    const list = Array.isArray(res?.data)
+      ? res.data
+      : Array.isArray(res)
+      ? res
+      : Array.isArray(res?.employees)
+      ? res.employees
+      : [];
     return {
-      ...raw,
-      employees,
-      items: employees,
-      data: employees,
-      pagination: raw.pagination || { total: employees.length, page: 1, limit: 20, totalPages: 1 },
+      success: true,
+      data: list,
+      employees: list,
+      items: list,
+      pagination: res?.meta || { total: list.length, page: 1, limit: 100, totalPages: 1 },
     };
   },
 
@@ -34,10 +37,22 @@ export const employeeService = {
     return this.getAllEmployees(params);
   },
 
+  async listDepartments() {
+    try {
+      const res = await http.get('/v1/departments');
+      return Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
+    } catch {
+      return [];
+    }
+  },
 
-  async getMetadata() {
-    const res = await http.get('/v1/employees/metadata');
-    return res.data;
+  async listDesignations() {
+    try {
+      const res = await http.get('/v1/designations');
+      return Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
+    } catch {
+      return [];
+    }
   },
 
   async getEmployeeById(id) {
@@ -57,20 +72,6 @@ export const employeeService = {
 
   async deleteEmployee(id) {
     const res = await http.delete(`/v1/employees/${id}`);
-    return res.data;
-  },
-
-  async endInternship(id, data = {}) {
-    const res = await http.post(`/v1/employees/${id}/end-internship`, data);
-    return res.data;
-  },
-
-  async uploadAvatar(id, formData) {
-    const res = await http.post(`/v1/employees/${id}/avatar`, formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
     return res.data;
   },
 };
