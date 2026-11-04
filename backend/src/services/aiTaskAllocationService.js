@@ -2,11 +2,12 @@ import { query } from '../config/db.js';
 import { nanoid } from 'nanoid';
 import { getCeoAdminExclusionSql, checkIsEmployeeCeoOrAdmin } from '../utils/roleUtils.js';
 import { auditService } from './auditService.js';
+import { aiClient } from '../utils/aiClient.js';
 
 /**
  * AI Task Allocation Service for TaskNera CEO Command Centre
  * Analyzes employee workloads, availability, and skillset matches,
- * while strictly excluding the CEO from any task assignment.
+ * powered by OpenAI & Gemini, while strictly excluding the CEO from any task assignment.
  */
 export const aiTaskAllocationService = {
   /**
@@ -97,8 +98,20 @@ export const aiTaskAllocationService = {
 
     const bestCandidate = candidatesRes.rows[0];
 
-    // Generate AI allocation reasoning
-    const reasoning = `AI selected ${bestCandidate.first_name} ${bestCandidate.last_name} (${bestCandidate.desig_title || 'Specialist'}, ${bestCandidate.dept_name || 'Department'}). Current capacity: ${100 - bestCandidate.current_workload}% available (${bestCandidate.active_tasks} active tasks). Suitable skills matched.`;
+    // Generate AI allocation reasoning (via OpenAI/Gemini with Heuristic fallback)
+    let reasoning = `AI selected ${bestCandidate.first_name} ${bestCandidate.last_name} (${bestCandidate.desig_title || 'Specialist'}, ${bestCandidate.dept_name || 'Department'}). Current capacity: ${100 - bestCandidate.current_workload}% available (${bestCandidate.active_tasks} active tasks). Suitable skills matched.`;
+
+    try {
+      const prompt = `Directive Title: "${task.title}". Description: "${task.description || 'None'}". Priority: ${task.priority}.
+Selected Assignee: ${bestCandidate.first_name} ${bestCandidate.last_name}, Role: ${bestCandidate.desig_title || 'Specialist'}, Department: ${bestCandidate.dept_name || 'General'}, Current Workload: ${bestCandidate.current_workload}%.
+Provide a concise 2-sentence executive allocation rationale explaining why this candidate is optimal for this organizational directive.`;
+      const aiResponse = await aiClient.generateCompletion(prompt);
+      if (aiResponse?.text) {
+        reasoning = `[${aiResponse.provider}] ${aiResponse.text}`;
+      }
+    } catch {
+      // Heuristic fallback already initialized
+    }
 
     const suggestedDeadline = new Date();
     suggestedDeadline.setDate(suggestedDeadline.getDate() + (task.priority === 'URGENT' ? 2 : task.priority === 'HIGH' ? 4 : 7));
@@ -289,4 +302,3 @@ export const aiTaskAllocationService = {
     throw new Error("Action must be 'APPROVE', 'REJECT', or 'OVERRIDE'.");
   },
 };
-
