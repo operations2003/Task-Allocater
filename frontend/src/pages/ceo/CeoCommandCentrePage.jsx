@@ -1,15 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   LayoutDashboard,
-  ShieldCheck,
+  CheckSquare,
   Sparkles,
   Clock,
-  CheckSquare,
-  ShieldAlert,
-  Layers,
+  ShieldCheck,
   RefreshCw,
-  Building2,
-  Users,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useToast } from '../../context/ToastContext.jsx';
@@ -25,7 +21,6 @@ import { CeoApprovalCentre } from '../../components/ceo/CeoApprovalCentre.jsx';
 import { CeoFilterBar } from '../../components/ceo/CeoFilterBar.jsx';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner.jsx';
 import { Button } from '../../components/common/Button.jsx';
-import { isCeoOrAdmin } from '../../utils/roleUtils.js';
 
 export const CeoCommandCentrePage = () => {
   const { user } = useAuth();
@@ -47,7 +42,7 @@ export const CeoCommandCentrePage = () => {
   const [employees, setEmployees] = useState([]);
   const [departments, setDepartments] = useState([]);
 
-  // Search & Multi-dimensional Filters
+  // Search & Filters
   const [search, setSearch] = useState('');
   const [filters, setFilters] = useState({
     department: '',
@@ -121,7 +116,7 @@ export const CeoCommandCentrePage = () => {
         setDepartments(Array.isArray(raw) ? raw : (raw?.departments || raw?.data || []));
       }
     } catch (err) {
-      console.error('Failed to load some executive command centre data:', err);
+      console.error('Failed to load dashboard data:', err);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -132,14 +127,14 @@ export const CeoCommandCentrePage = () => {
     loadAllData();
   }, [loadAllData]);
 
-  // Executive Task Management Handlers
+  // Task Actions
   const handleCreateTask = async (taskData) => {
     try {
       await ceoTaskService.createOfficialTask(taskData);
-      toast.success('Official executive directive deployed successfully.');
+      toast.success('Task created successfully.');
       loadAllData(true);
     } catch (err) {
-      toast.error(err.message || 'Failed to create directive.');
+      toast.error(err.message || 'Failed to create task.');
       throw err;
     }
   };
@@ -157,7 +152,7 @@ export const CeoCommandCentrePage = () => {
   const handleReassignTask = async (taskId, newAssigneeId, reason) => {
     try {
       await ceoTaskService.reassignTask(taskId, newAssigneeId, reason);
-      toast.success('Task directive successfully reassigned.');
+      toast.success('Task reassigned.');
       loadAllData(true);
     } catch (err) {
       toast.error(err.message || 'Failed to reassign task.');
@@ -167,7 +162,7 @@ export const CeoCommandCentrePage = () => {
   const handleModifyDeadline = async (taskId, newDate, reason) => {
     try {
       await ceoTaskService.modifyDeadline(taskId, newDate, reason);
-      toast.success('Task deadline updated.');
+      toast.success('Deadline updated.');
       loadAllData(true);
     } catch (err) {
       toast.error(err.message || 'Failed to update deadline.');
@@ -187,7 +182,7 @@ export const CeoCommandCentrePage = () => {
   const handleDeleteTask = async (taskId) => {
     try {
       await ceoTaskService.deleteTask(taskId);
-      toast.success('Task directive removed from system.');
+      toast.success('Task deleted.');
       loadAllData(true);
     } catch (err) {
       toast.error(err.message || 'Failed to delete task.');
@@ -197,14 +192,14 @@ export const CeoCommandCentrePage = () => {
   const handleReopenTask = async (taskId, data) => {
     try {
       await taskService.reopenTask(taskId, data);
-      toast.success('Task reopened with executive remarks.');
+      toast.success('Task reopened.');
       loadAllData(true);
     } catch (err) {
       toast.error(err.message || 'Failed to reopen task.');
     }
   };
 
-  // AI Allocation Handlers
+  // AI Allocation Actions
   const handleApproveAiAllocation = async (id, item) => {
     try {
       await ceoTaskService.actOnAiAllocation(id, 'APPROVE', {
@@ -215,7 +210,7 @@ export const CeoCommandCentrePage = () => {
         dueDate: item.suggestedDeadline,
         subtasks: item.aiSubtasks,
       });
-      toast.success('AI allocation approved and deployed as official directive.');
+      toast.success('Allocation approved and task created.');
       setAiAllocations((prev) => prev.filter((a) => a.id !== id));
       loadAllData(true);
     } catch (err) {
@@ -226,17 +221,17 @@ export const CeoCommandCentrePage = () => {
   const handleRejectAiAllocation = async (id, feedback) => {
     try {
       await ceoTaskService.actOnAiAllocation(id, 'REJECT', { feedback });
-      toast.success('AI allocation recommendation rejected.');
+      toast.success('Recommendation dismissed.');
       setAiAllocations((prev) => prev.filter((a) => a.id !== id));
     } catch (err) {
-      toast.error('Failed to reject allocation.');
+      toast.error('Failed to dismiss allocation.');
     }
   };
 
   const handleAdjustAiAllocation = async (id, adjustments) => {
     try {
       await ceoTaskService.actOnAiAllocation(id, 'APPROVE', adjustments);
-      toast.success('AI allocation approved with custom overrides.');
+      toast.success('Task created with your adjustments.');
       setAiAllocations((prev) => prev.filter((a) => a.id !== id));
       loadAllData(true);
     } catch (err) {
@@ -244,18 +239,18 @@ export const CeoCommandCentrePage = () => {
     }
   };
 
-  // Executive Approval Decision Handler
+  // Approvals Actions
   const handleExecutiveDecision = async (id, decision, comment) => {
     try {
       await ceoTaskService.actOnExecutiveApproval(id, decision, comment);
-      toast.success(`Executive request marked as ${decision.toLowerCase()}d.`);
+      toast.success(`Request ${decision.toLowerCase()}d.`);
       setApprovals((prev) => prev.filter((a) => a.id !== id));
     } catch (err) {
-      toast.error('Failed to record executive decision.');
+      toast.error('Failed to record decision.');
     }
   };
 
-  // Filter Tasks for the Tasks Tab
+  // Filter Tasks
   const filteredTasks = tasks.filter((t) => {
     if (search) {
       const q = search.toLowerCase();
@@ -290,28 +285,23 @@ export const CeoCommandCentrePage = () => {
   });
 
   if (loading) {
-    return <LoadingSpinner fullPage message="Initialising TaskNera CEO Command Centre..." />;
+    return <LoadingSpinner fullPage message="Loading workspace..." />;
   }
 
   return (
     <div className="space-y-6">
-      {/* Top Command Centre Header */}
-      <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <span className="p-2 rounded-xl bg-gradient-to-br from-brand-600 to-indigo-800 text-white shadow-brand">
-              <ShieldCheck className="w-5 h-5" />
-            </span>
-            <h1 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">
-              TaskNera CEO Command Centre
-            </h1>
-          </div>
-          <p className="text-xs text-slate-500 max-w-2xl leading-relaxed">
-            Executive task orchestration, autonomous workforce allocations, delay tracking, and sensitive organisational decision governance.
+      {/* Top Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
+            Executive Overview
+          </h1>
+          <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
+            Monitor tasks, review recommendations, and approve team requests.
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2">
           <Button
             variant="outline"
             onClick={() => loadAllData(true)}
@@ -319,19 +309,19 @@ export const CeoCommandCentrePage = () => {
             className="text-xs inline-flex items-center gap-1.5"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
-            Refresh Intelligence
+            Refresh
           </Button>
         </div>
       </div>
 
-      {/* Executive Command Centre Tabs Navigation */}
-      <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-2 overflow-x-auto text-xs font-bold">
+      {/* Tabs */}
+      <div className="flex items-center gap-1.5 border-b border-slate-200 pb-2 overflow-x-auto text-xs font-semibold">
         {[
-          { id: 'overview', label: 'Command Centre Overview', icon: LayoutDashboard },
-          { id: 'tasks', label: 'Task Management', icon: CheckSquare, count: tasks.length },
-          { id: 'ai-allocation', label: 'AI Task Allocation', icon: Sparkles, count: aiAllocations.length, badgeColor: 'bg-purple-100 text-purple-700' },
-          { id: 'pending', label: 'Pending Tasks & Delays', icon: Clock, count: pendingReport.metrics?.totalDelayed, badgeColor: 'bg-rose-100 text-rose-700' },
-          { id: 'approvals', label: 'Approval Centre', icon: ShieldAlert, count: approvals.length, badgeColor: 'bg-amber-100 text-amber-800' },
+          { id: 'overview', label: 'Overview', icon: LayoutDashboard },
+          { id: 'tasks', label: 'All Tasks', icon: CheckSquare, count: tasks.length },
+          { id: 'ai-allocation', label: 'Suggested Allocations', icon: Sparkles, count: aiAllocations.length },
+          { id: 'pending', label: 'Pending Tasks', icon: Clock, count: pendingReport.metrics?.totalDelayed },
+          { id: 'approvals', label: 'Approvals', icon: ShieldCheck, count: approvals.length },
         ].map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
@@ -339,18 +329,18 @@ export const CeoCommandCentrePage = () => {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl transition-all cursor-pointer shrink-0 ${
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-lg transition-colors cursor-pointer shrink-0 ${
                 isActive
-                  ? 'bg-brand-600 text-white shadow-brand'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800'
+                  ? 'bg-slate-900 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
               }`}
             >
-              <Icon className="w-4 h-4" />
+              <Icon className="w-3.5 h-3.5" />
               <span>{tab.label}</span>
               {tab.count !== undefined && tab.count > 0 && (
                 <span
-                  className={`px-1.5 py-0.2 rounded-full text-[10px] font-extrabold ${
-                    isActive ? 'bg-white text-brand-700' : tab.badgeColor || 'bg-slate-200 text-slate-700'
+                  className={`text-[10px] font-bold px-1.5 py-0.2 rounded ${
+                    isActive ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
                   }`}
                 >
                   {tab.count}
@@ -360,29 +350,6 @@ export const CeoCommandCentrePage = () => {
           );
         })}
       </div>
-
-      {/* Global Filter Bar (Available on Overview and Tasks tab) */}
-      {(activeTab === 'overview' || activeTab === 'tasks') && (
-        <CeoFilterBar
-          search={search}
-          setSearch={setSearch}
-          filters={filters}
-          setFilters={setFilters}
-          departments={departments}
-          employees={employees}
-          onReset={() => {
-            setSearch('');
-            setFilters({
-              department: '',
-              assigneeId: '',
-              status: '',
-              priority: '',
-              assignedBy: '',
-              dateScope: '',
-            });
-          }}
-        />
-      )}
 
       {/* Tab Panels */}
       {activeTab === 'overview' && (
@@ -396,18 +363,39 @@ export const CeoCommandCentrePage = () => {
       )}
 
       {activeTab === 'tasks' && (
-        <CeoTaskManagement
-          tasks={filteredTasks}
-          employees={employees}
-          departments={departments}
-          onCreateTask={handleCreateTask}
-          onUpdateStatus={handleUpdateStatus}
-          onReassignTask={handleReassignTask}
-          onModifyDeadline={handleModifyDeadline}
-          onChangePriority={handleChangePriority}
-          onDeleteTask={handleDeleteTask}
-          onReopenTask={handleReopenTask}
-        />
+        <div className="space-y-4">
+          <CeoFilterBar
+            search={search}
+            setSearch={setSearch}
+            filters={filters}
+            setFilters={setFilters}
+            departments={departments}
+            employees={employees}
+            onReset={() => {
+              setSearch('');
+              setFilters({
+                department: '',
+                assigneeId: '',
+                status: '',
+                priority: '',
+                assignedBy: '',
+                dateScope: '',
+              });
+            }}
+          />
+          <CeoTaskManagement
+            tasks={filteredTasks}
+            employees={employees}
+            departments={departments}
+            onCreateTask={handleCreateTask}
+            onUpdateStatus={handleUpdateStatus}
+            onReassignTask={handleReassignTask}
+            onModifyDeadline={handleModifyDeadline}
+            onChangePriority={handleChangePriority}
+            onDeleteTask={handleDeleteTask}
+            onReopenTask={handleReopenTask}
+          />
+        </div>
       )}
 
       {activeTab === 'ai-allocation' && (
@@ -420,17 +408,11 @@ export const CeoCommandCentrePage = () => {
         />
       )}
 
-      {activeTab === 'pending' && (
-        <PendingTasksSection report={pendingReport} />
-      )}
+      {activeTab === 'pending' && <PendingTasksSection report={pendingReport} />}
 
       {activeTab === 'approvals' && (
-        <CeoApprovalCentre
-          approvals={approvals}
-          onDecision={handleExecutiveDecision}
-        />
+        <CeoApprovalCentre approvals={approvals} onDecision={handleExecutiveDecision} />
       )}
     </div>
   );
 };
-
