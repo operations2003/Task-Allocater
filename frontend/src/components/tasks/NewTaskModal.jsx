@@ -13,6 +13,7 @@ export const NewTaskModal = ({
     description: '',
     department: DEPARTMENTS[0] || 'HR Operations',
     priority: 'High',
+    weightage: 25,
     assignee: '',
     due_date: getTodayStr(),
   });
@@ -22,7 +23,12 @@ export const NewTaskModal = ({
   if (!open) return null;
 
   const handleChange = (field, value) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
+    if (field === 'priority') {
+      const defaultWeight = value === 'Critical' ? 40 : value === 'High' ? 25 : value === 'Low' ? 10 : 15;
+      setFormData((prev) => ({ ...prev, priority: value, weightage: defaultWeight }));
+    } else {
+      setFormData((prev) => ({ ...prev, [field]: value }));
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -43,6 +49,7 @@ export const NewTaskModal = ({
         description: formData.description.trim(),
         department: formData.department,
         priority: formData.priority,
+        weightage: Number(formData.weightage) || 25,
         assignee_id: selectedEmp.id,
         assignee_name: selectedEmp.full_name || `${selectedEmp.first_name || ''} ${selectedEmp.last_name || ''}`.trim(),
         assignee_email: selectedEmp.email,
@@ -101,8 +108,8 @@ export const NewTaskModal = ({
             />
           </div>
 
-          {/* 2-Col: Department & Priority */}
-          <div className="grid grid-cols-2 gap-3">
+          {/* 3-Col: Department, Priority & Weightage */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
               <label className="eyebrow block">Department</label>
               <select
@@ -130,6 +137,20 @@ export const NewTaskModal = ({
                     {p}
                   </option>
                 ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="eyebrow block">Weightage</label>
+              <select
+                className="field mt-1.5"
+                value={formData.weightage}
+                onChange={(e) => handleChange('weightage', Number(e.target.value))}
+              >
+                <option value={10} className="bg-background text-foreground">10% · Low load</option>
+                <option value={15} className="bg-background text-foreground">15% · Standard</option>
+                <option value={25} className="bg-background text-foreground">25% · High load</option>
+                <option value={40} className="bg-background text-foreground">40% · Critical SLA</option>
               </select>
             </div>
           </div>

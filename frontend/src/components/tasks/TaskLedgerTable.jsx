@@ -70,6 +70,11 @@ export const TaskLedgerTable = ({
                     <span className="text-[10.5px] text-muted-foreground">
                       {task.department || 'Operations'}
                     </span>
+                    {task.weightage && (
+                      <span className="inline-flex items-center rounded border border-white/[0.08] bg-white/[0.03] px-1.5 py-0.5 text-[9.5px] font-medium text-signal/90 num">
+                        {task.weightage}% wt
+                      </span>
+                    )}
                     {task.escalation_level && task.escalation_level !== 'None' && (
                       <span
                         className={`inline-flex items-center gap-1 text-[10px] font-semibold ${

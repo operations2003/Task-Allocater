@@ -138,8 +138,24 @@ export const PeopleLoadPage = () => {
                       (t) => t.status === 'Overdue' || (t.is_overdue && t.status !== 'Completed')
                     ).length;
 
-                    // Capacity load formula: max 4 tasks benchmark
-                    const loadPct = Math.min(100, Math.round((empTasks.length / 4) * 100));
+                    // Workload load formula: calculated from active tasks' assigned weightage or employee table
+                    const activeTasksList = empTasks.filter(
+                      (t) =>
+                        t.status !== 'Completed' &&
+                        t.status !== 'COMPLETED' &&
+                        t.status !== 'Cancelled' &&
+                        t.status !== 'CANCELLED'
+                    );
+
+                    const sumWeightage = activeTasksList.reduce(
+                      (sum, t) => sum + (Number(t.weightage) || (t.priority === 'Critical' || t.priority === 'High' ? 25 : 15)),
+                      0
+                    );
+
+                    const loadPct = Math.min(
+                      100,
+                      Number(emp.current_workload) > 0 ? Number(emp.current_workload) : sumWeightage
+                    );
 
                     const currentAvailability =
                       emp.availability ||

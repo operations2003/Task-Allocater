@@ -3,6 +3,24 @@ import { nanoid } from 'nanoid';
 import { checkIsEmployeeCeoOrAdmin, isCeoOrAdmin, getCeoAdminExclusionSql } from '../utils/roleUtils.js';
 import { auditService } from './auditService.js';
 
+async function recalculateEmployeeWorkload(employeeId) {
+  if (!employeeId) return;
+  try {
+    await query(
+      `UPDATE employees
+       SET current_workload = LEAST(100, (
+         SELECT COALESCE(SUM(COALESCE(weightage, 25)), 0)
+         FROM work_tasks
+         WHERE assignee_id = $1 AND status NOT IN ('COMPLETED', 'CANCELLED')
+       ))
+       WHERE id = $1`,
+      [employeeId]
+    );
+  } catch (err) {
+    console.warn('Failed to update employee workload:', err.message);
+  }
+}
+
 /**
  * TaskNera CEO Command Centre - Executive Task Service
  * Enforces absolute CEO cross-department authority while strictly forbidding CEO self-assignment.
@@ -403,17 +421,23 @@ export const ceoTaskService = {
       deadline = d.toISOString().split('T')[0];
     }
 
+    const taskWeightage = Number(payload.weightage) || (
+      priority.toUpperCase() === 'CRITICAL' || priority.toUpperCase() === 'URGENT' ? 40 :
+      priority.toUpperCase() === 'HIGH' ? 25 :
+      priority.toUpperCase() === 'LOW' ? 10 : 15
+    );
+
     const sql = `
       INSERT INTO work_tasks (
         id, org_id, title, description, creator_id, assignee_id, dept_id,
         priority, status, due_date, original_deadline, current_deadline,
         progress, subtasks, assignment_source, assigned_by, is_official_directive,
-        created_at, updated_at
+        weightage, created_at, updated_at
       ) VALUES (
         $1, $2, $3, $4, $5, $6, $7,
         $8, 'TODO', $9, $9, $9,
         0, $10, $11, $5, true,
-        NOW(), NOW()
+        $12, NOW(), NOW()
       )
       RETURNING *;
     `;
@@ -430,9 +454,13 @@ export const ceoTaskService = {
       deadline,
       JSON.stringify(subtasksArray),
       assignmentSource,
+      taskWeightage,
     ]);
 
     const task = res.rows[0];
+
+    // Recalculate assignee workload in database
+    await recalculateEmployeeWorkload(finalAssigneeId);
 
     // If AI auto-allocated, record in ai_task_allocations table
     if (assignmentSource === 'AI') {
@@ -532,6 +560,10 @@ export const ceoTaskService = {
       notes: reason || 'Directive reassigned by CEO.',
     });
 
+    // Recalculate assignee workload for both previous and new owner
+    await recalculateEmployeeWorkload(current.assignee_id);
+    await recalculateEmployeeWorkload(newAssigneeId);
+
     return updated;
   },
 
@@ -573,6 +605,10 @@ export const ceoTaskService = {
       notes: reason || 'Directive deadline modified by CEO.',
     });
 
+    // Recalculate assignee workload for both previous and new owner
+    await recalculateEmployeeWorkload(current.assignee_id);
+    await recalculateEmployeeWorkload(newAssigneeId);
+
     return updated;
   },
 
@@ -612,6 +648,10 @@ export const ceoTaskService = {
       updatedValues: { priority: norm },
       notes: `Priority adjusted to ${norm} by CEO.`,
     });
+
+    // Recalculate assignee workload for both previous and new owner
+    await recalculateEmployeeWorkload(current.assignee_id);
+    await recalculateEmployeeWorkload(newAssigneeId);
 
     return updated;
   },
@@ -655,6 +695,10 @@ export const ceoTaskService = {
       notes: reason || `Status set to ${norm} by CEO.`,
     });
 
+    // Recalculate assignee workload for both previous and new owner
+    await recalculateEmployeeWorkload(current.assignee_id);
+    await recalculateEmployeeWorkload(newAssigneeId);
+
     return updated;
   },
 
@@ -682,6 +726,7 @@ export const ceoTaskService = {
     });
 
     await query(`DELETE FROM work_tasks WHERE id = $1 AND org_id = $2;`, [id, orgId]);
+    await recalculateEmployeeWorkload(current.assignee_id);
     return { success: true, deletedTaskId: id };
   },
 };

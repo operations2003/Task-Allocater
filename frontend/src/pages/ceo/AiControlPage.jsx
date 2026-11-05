@@ -279,6 +279,13 @@ export const AiControlPage = () => {
         ];
       }
 
+      // 5b. Determine Task Weightage from wording context (e.g. Critical: 40%, High: 25%, Routine: 15%)
+      const isUrgent = fullPrompt.includes('urgent') || fullPrompt.includes('critical') || fullPrompt.includes('immediate') || fullPrompt.includes('asap');
+      const isRoutine = fullPrompt.includes('routine') || fullPrompt.includes('minor') || fullPrompt.includes('quick');
+      const taskWeightage = isUrgent ? 40 : isRoutine ? 15 : 25;
+      const initialWorkload = Number(selectedAssignee.current_workload || 0);
+      const postWorkload = Math.min(100, initialWorkload + taskWeightage);
+
       // 6. Create the official task directive in the database!
       let createdTaskId = null;
 
@@ -288,7 +295,8 @@ export const AiControlPage = () => {
           description: taskForm.description.trim() || `Directive allocated by AI to ${empName} based on semantic understanding of "${taskForm.title}".`,
           department: winningDept,
           dept_id: selectedAssignee.dept_id,
-          priority: 'High',
+          priority: isUrgent ? 'Critical' : 'High',
+          weightage: taskWeightage,
           assignee_id: selectedAssignee.id,
           assignee_name: empName,
           assignee_email: selectedAssignee.email,
@@ -297,6 +305,15 @@ export const AiControlPage = () => {
         });
 
         createdTaskId = created?.id || created?.data?.id || created?.data?.taskId || 'created';
+
+        // Update local employees list so subsequent allocations consider the updated workload
+        setEmployees((prev) =>
+          prev.map((e) =>
+            e.id === selectedAssignee.id
+              ? { ...e, current_workload: postWorkload }
+              : e
+          )
+        );
       }
 
       // 7. Compose NLP Reasoning
@@ -304,12 +321,15 @@ export const AiControlPage = () => {
 
       const rationaleText = isSensitive
         ? `This directive involves executive compensation, policy, or authority and cannot be auto-dispatched. It has been queued in Executive Approvals for CEO decision.`
-        : `AI classified this directive under ${winningDept} based on ${triggerPhrase}. Assigned to ${empName} (${desigTitle}) as the designated specialist in ${winningDept} with optimal workload capacity.`;
+        : `AI classified this directive under ${winningDept} based on ${triggerPhrase}. Assigned to ${empName} (${desigTitle}) with ${taskWeightage}% weightage impact.`;
 
       const result = {
         mode: isSensitive ? 'approval' : 'allocated',
         detectedDepartment: winningDept,
         matchedTriggers,
+        weightage: taskWeightage,
+        workloadBefore: initialWorkload,
+        workloadAfter: postWorkload,
         employee: {
           id: selectedAssignee.id,
           name: empName,
@@ -466,6 +486,22 @@ export const AiControlPage = () => {
                   {allocatedResult.employee?.name} · {allocatedResult.employee?.department}
                   {allocatedResult.employee?.designation ? ` (${allocatedResult.employee.designation})` : ''}
                 </p>
+
+                {/* Weightage Allocation & Workload Gauge */}
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-white/[0.06] bg-white/[0.02] p-2.5">
+                  <div className="flex items-center gap-2">
+                    <span className="eyebrow text-[9.5px]">Assigned Weightage:</span>
+                    <span className="num font-semibold text-signal text-[12px]">
+                      {allocatedResult.weightage}%
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                    <span>Workload load:</span>
+                    <span className="num text-foreground/80">{allocatedResult.workloadBefore}%</span>
+                    <span>→</span>
+                    <span className="num font-semibold text-signal">{allocatedResult.workloadAfter}%</span>
+                  </div>
+                </div>
 
                 <p className="text-[11.5px] leading-relaxed text-muted-foreground">
                   {allocatedResult.plan?.rationale}
