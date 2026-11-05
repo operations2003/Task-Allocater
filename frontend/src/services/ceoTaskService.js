@@ -215,19 +215,19 @@ export const ceoTaskService = {
    * Official task creation by CEO
    */
   async createOfficialTask(data) {
+    const payload = {
+      ...data,
+      assigneeId: data.assigneeId || data.assignee_id,
+      deptId: data.deptId || data.dept_id,
+      dueDate: data.dueDate || data.due_date,
+      isOfficial: true,
+      assignedBy: 'CEO',
+    };
     try {
-      const res = await http.post('/v1/ceo/tasks', {
-        ...data,
-        isOfficial: true,
-        assignedBy: 'CEO',
-      });
+      const res = await http.post('/v1/ceo/tasks', payload);
       return res.data || res;
     } catch {
-      const fallback = await http.post('/v1/tasks', {
-        ...data,
-        isOfficial: true,
-        assignedBy: 'CEO',
-      });
+      const fallback = await http.post('/v1/tasks', payload);
       return fallback.data || fallback;
     }
   },

@@ -232,7 +232,13 @@ export const ceoTaskService = {
    * (title, description, domain, workload, skills) and automatically allocates the best team member.
    */
   async createOfficialTask(orgId, currentUser, payload) {
-    const { title, description, assigneeId, deptId, priority = 'MEDIUM', dueDate, subtasks = [] } = payload;
+    const title = payload.title;
+    const description = payload.description;
+    const assigneeId = payload.assigneeId || payload.assignee_id;
+    const deptId = payload.deptId || payload.dept_id;
+    const priority = payload.priority || 'MEDIUM';
+    const dueDate = payload.dueDate || payload.due_date;
+    const subtasks = payload.subtasks || [];
 
     if (!title || !title.trim()) {
       throw new Error('Task title is required.');

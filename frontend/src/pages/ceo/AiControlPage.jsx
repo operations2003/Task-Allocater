@@ -1,11 +1,67 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Bot, Sparkles, CheckCircle2, ShieldAlert, ArrowRight, RotateCw, Loader2, BellRing } from 'lucide-react';
+import { Bot, Sparkles, CheckCircle2, ShieldAlert, ArrowRight, RotateCw, Loader2, BellRing, Target, Cpu } from 'lucide-react';
 import { PageHeader } from '../../components/common/PageHeader.jsx';
 import { useToast } from '../../context/ToastContext.jsx';
 import { ceoTaskService } from '../../services/ceoTaskService.js';
 import { employeeService } from '../../services/employeeService.js';
 import { DEPARTMENTS, formatDate, formatTime } from '../../constants/neraTheme.js';
+
+// Comprehensive NLP Semantic Vocabulary for the 4 Company Departments
+const DEPARTMENT_SEMANTICS = {
+  'IT': {
+    name: 'IT',
+    keywords: [
+      'deploy', 'deployment', 'server', 'servers', 'cloud', 'aws', 'azure', 'docker', 'kubernetes',
+      'devops', 'ci/cd', 'staging', 'production', 'build', 'release', 'pipeline', 'code', 'coding',
+      'bug', 'issue', 'fix', 'feature', 'frontend', 'backend', 'fullstack', 'api', 'endpoint',
+      'rest', 'graphql', 'microservices', 'react', 'node', 'javascript', 'python', 'git', 'github',
+      'commit', 'repository', 'pr', 'database', 'db', 'postgres', 'postgresql', 'mysql', 'mongodb',
+      'sql', 'query', 'redis', 'backup', 'migration', 'schema', 'replica', 'sharding', 'it', 'hardware',
+      'laptop', 'desktop', 'network', 'wifi', 'lan', 'firewall', 'vpn', 'ip', 'domain', 'dns', 'ssl',
+      'security', 'audit logs', 'credentials', 'password', 'access', 'permission', 'auth', 'oauth',
+      'token', 'monitoring', 'uptime', 'latency', 'benchmark', 'web', 'app', 'ui', 'ux', 'test', 'qa'
+    ],
+  },
+  'Talent Acquisition': {
+    name: 'Talent Acquisition',
+    keywords: [
+      'hire', 'hiring', 'headhunt', 'headhunting', 'recruit', 'recruiter', 'recruiting', 'recruitment',
+      'candidate', 'candidates', 'applicant', 'applicants', 'profile', 'profiles', 'resume', 'resumes',
+      'cv', 'cvs', 'curriculum vitae', 'portfolio', 'shortlist', 'shortlisting', 'screening', 'vetting',
+      'job', 'jd', 'job description', 'vacancy', 'vacancies', 'opening', 'requisition', 'sourcing',
+      'source', 'outreach', 'talent pool', 'talent pipeline', 'talent', 'linkedin', 'naukri', 'indeed',
+      'portal', 'ats', 'interview', 'interviews', 'round', 'technical round', 'assessment call',
+      'interviewer', 'scheduling', 'offer', 'offer letter', 'negotiation', 'ctc', 'notice period',
+      'dropout', 'walk-in', 'hiring pipeline'
+    ],
+  },
+  'Learning & Development': {
+    name: 'Learning & Development',
+    keywords: [
+      'training', 'session', 'workshop', 'workshops', 'upskill', 'upskilling', 'reskill', 'soft skills',
+      'learning', 'development', 'l&d', 'curriculum', 'module', 'modules', 'course', 'courses', 'class',
+      'syllabus', 'study material', 'handbook', 'guide', 'sop training', 'induction', 'orientation',
+      'fresher', 'new joiner training', 'culture training', 'compliance training', 'coaching', 'mentor',
+      'mentorship', 'assessment', 'assessments', 'quiz', 'exam', 'score', 'evaluation', 'feedback form',
+      'certification', 'trainer', 'webinar', 'seminar', 'lecture', 'competency matrix'
+    ],
+  },
+  'HR Operations': {
+    name: 'HR Operations',
+    keywords: [
+      'operations', 'hr', 'hr operations', 'personnel', 'staff', 'employee', 'roster', 'shift', 'shifts',
+      'shift handover', 'attendance', 'biometric', 'punch', 'punch-in', 'late mark', 'leave', 'leaves',
+      'sick leave', 'casual leave', 'paid leave', 'holiday', 'timesheet', 'working hours', 'payroll',
+      'salary', 'payslip', 'salary slip', 'wages', 'reimbursement', 'expense', 'expenses', 'bonus',
+      'incentive', 'deduction', 'tds', 'pf', 'provident fund', 'esi', 'bank details', 'onboarding',
+      'joining documentation', 'bgv', 'background verification', 'id card', 'appointment letter',
+      'contracts', 'nda', 'compliance', 'labour law', 'statutory', 'exit', 'resignation', 'clearance',
+      'relieving letter', 'experience letter', 'fnf', 'full and final', 'employee relations', 'grievance',
+      'documentation', 'facility', 'vendor', 'client requirements'
+    ],
+  },
+};
 
 const AI_MAY_RULES = [
   'Allocate routine operational tasks to eligible employees',
@@ -80,6 +136,10 @@ export const AiControlPage = () => {
     }
   };
 
+  /**
+   * NLP Semantic Understanding Classifier
+   * Analyzes prompt wording, identifies target department, and assigns to ONE person in that department.
+   */
   const handleAllocate = async () => {
     if (!taskForm.title.trim()) {
       toast.show('Describe the task first', 'destructive');
@@ -90,123 +150,170 @@ export const AiControlPage = () => {
     setAllocatedResult(null);
 
     try {
-      const textToAnalyze = `${taskForm.title} ${taskForm.description}`.toLowerCase();
+      const fullPrompt = `${taskForm.title} ${taskForm.description || ''}`.toLowerCase();
 
-      // Check if this is a sensitive executive decision
+      // 1. Check for sensitive executive keywords requiring CEO sign-off
       const isSensitive =
-        textToAnalyze.includes('salary') ||
-        textToAnalyze.includes('compensation') ||
-        textToAnalyze.includes('terminate') ||
-        textToAnalyze.includes('termination') ||
-        textToAnalyze.includes('fire') ||
-        textToAnalyze.includes('disciplinary') ||
-        textToAnalyze.includes('policy') ||
-        textToAnalyze.includes('executive');
+        fullPrompt.includes('salary') ||
+        fullPrompt.includes('compensation') ||
+        fullPrompt.includes('terminate') ||
+        fullPrompt.includes('termination') ||
+        fullPrompt.includes('fire') ||
+        fullPrompt.includes('disciplinary') ||
+        fullPrompt.includes('policy') ||
+        fullPrompt.includes('executive directive');
 
-      // Determine matching department from real departments in system
-      let matchedDept = taskForm.department && taskForm.department !== 'any' ? taskForm.department : '';
+      // 2. NLP Semantic Department Classification
+      let winningDept = taskForm.department && taskForm.department !== 'any' ? taskForm.department : null;
+      let matchedTriggers = [];
 
-      if (!matchedDept) {
-        // Smart keyword classification based on company departments
-        if (
-          textToAnalyze.includes('deploy') ||
-          textToAnalyze.includes('server') ||
-          textToAnalyze.includes('cloud') ||
-          textToAnalyze.includes('code') ||
-          textToAnalyze.includes('bug') ||
-          textToAnalyze.includes('database') ||
-          textToAnalyze.includes('api') ||
-          textToAnalyze.includes('it') ||
-          textToAnalyze.includes('security') ||
-          textToAnalyze.includes('software') ||
-          textToAnalyze.includes('system') ||
-          textToAnalyze.includes('tech')
-        ) {
-          matchedDept = 'IT';
-        } else if (
-          textToAnalyze.includes('hire') ||
-          textToAnalyze.includes('hiring') ||
-          textToAnalyze.includes('candidate') ||
-          textToAnalyze.includes('interview') ||
-          textToAnalyze.includes('recruitment') ||
-          textToAnalyze.includes('sourcing') ||
-          textToAnalyze.includes('cv') ||
-          textToAnalyze.includes('resume') ||
-          textToAnalyze.includes('talent')
-        ) {
-          matchedDept = 'Talent Acquisition';
-        } else if (
-          textToAnalyze.includes('training') ||
-          textToAnalyze.includes('learning') ||
-          textToAnalyze.includes('workshop') ||
-          textToAnalyze.includes('upskill') ||
-          textToAnalyze.includes('development') ||
-          textToAnalyze.includes('course')
-        ) {
-          matchedDept = 'Learning & Development';
-        } else {
-          matchedDept = 'HR Operations';
+      if (!winningDept) {
+        // Score all 4 departments against wording
+        let departmentScores = {};
+
+        for (const [deptKey, deptConfig] of Object.entries(DEPARTMENT_SEMANTICS)) {
+          let score = 0;
+          let triggers = [];
+
+          for (const kw of deptConfig.keywords) {
+            // Whole word or boundary match
+            const regex = new RegExp(`\\b${kw}`, 'i');
+            if (regex.test(fullPrompt)) {
+              score += kw.length > 5 ? 15 : 10;
+              triggers.push(kw);
+            }
+          }
+
+          departmentScores[deptKey] = { score, triggers };
+        }
+
+        // Find department with highest score
+        let bestScore = -1;
+        let bestDept = 'HR Operations'; // standard organizational baseline
+
+        for (const [deptKey, result] of Object.entries(departmentScores)) {
+          if (result.score > bestScore) {
+            bestScore = result.score;
+            bestDept = deptKey;
+            matchedTriggers = result.triggers;
+          }
+        }
+
+        winningDept = bestDept;
+      } else {
+        // Find triggers matching the explicitly selected department
+        const deptConfig = DEPARTMENT_SEMANTICS[winningDept];
+        if (deptConfig) {
+          matchedTriggers = deptConfig.keywords.filter((kw) => fullPrompt.includes(kw));
         }
       }
 
-      // Filter real employees in this department
+      // 3. Filter employees STRICTLY to this single identified department
       const deptEmployees = employees.filter((e) => {
         const d = (e.department || e.department_name || e.dept_name || '').toLowerCase();
-        return d === matchedDept.toLowerCase() || d.includes(matchedDept.toLowerCase());
+        return d === winningDept.toLowerCase() || d.includes(winningDept.toLowerCase());
       });
 
       const candidatePool = deptEmployees.length > 0 ? deptEmployees : employees;
 
       if (candidatePool.length === 0) {
-        throw new Error('No active employees found in the system to assign this directive.');
+        throw new Error(`No active personnel registered under the ${winningDept} department.`);
       }
 
-      // Select candidate with lowest workload / fair distribution
+      // 4. Select EXACTLY ONE PERSON in that department based on fair workload balance
       const sortedCandidates = [...candidatePool].sort((a, b) => {
+        // Primary: Availability
+        const availScoreA = (a.availability_status || a.availability || '').toUpperCase() === 'AVAILABLE' ? 0 : 50;
+        const availScoreB = (b.availability_status || b.availability || '').toUpperCase() === 'AVAILABLE' ? 0 : 50;
+        if (availScoreA !== availScoreB) return availScoreA - availScoreB;
+
+        // Secondary: Current Workload
         const loadA = Number(a.current_workload || 0);
         const loadB = Number(b.current_workload || 0);
-        return loadA - loadB;
+        if (loadA !== loadB) return loadA - loadB;
+
+        // Tertiary: Stable tie-breaking rotation
+        return String(a.id).localeCompare(String(b.id));
       });
 
-      const bestCandidate = sortedCandidates[0];
+      const selectedAssignee = sortedCandidates[0];
       const empName =
-        bestCandidate.full_name ||
-        `${bestCandidate.first_name || ''} ${bestCandidate.last_name || ''}`.trim() ||
-        bestCandidate.name ||
-        bestCandidate.email;
+        selectedAssignee.full_name ||
+        `${selectedAssignee.first_name || ''} ${selectedAssignee.last_name || ''}`.trim() ||
+        selectedAssignee.name ||
+        selectedAssignee.email;
 
       const desigTitle =
-        bestCandidate.designation_title ||
-        bestCandidate.desig_title ||
-        bestCandidate.designation ||
-        'Team Member';
+        selectedAssignee.designation_title ||
+        selectedAssignee.desig_title ||
+        selectedAssignee.designation ||
+        'Specialist';
 
-      // Due date: 2 business days from today
       const targetDeadline = new Date(Date.now() + 86400000 * 2).toISOString().slice(0, 10);
 
+      // 5. Generate contextual subtasks based on detected department & wording
+      let generatedSubtasks = [];
+      if (winningDept === 'IT') {
+        generatedSubtasks = [
+          { title: 'Validate requirements, environment configurations, and rollback criteria' },
+          { title: 'Execute technical deliverable and run verification tests' },
+          { title: 'Inspect system logs, verify operational stability, and submit proof' },
+        ];
+      } else if (winningDept === 'Talent Acquisition') {
+        generatedSubtasks = [
+          { title: 'Review requisition criteria and align candidate sourcing filters' },
+          { title: 'Screen candidate profiles and conduct preliminary qualification' },
+          { title: 'Reconcile recruitment tracker and submit shortlisted candidates' },
+        ];
+      } else if (winningDept === 'Learning & Development') {
+        generatedSubtasks = [
+          { title: 'Prepare learning module syllabus and training collateral' },
+          { title: 'Conduct training session with participants and record attendance' },
+          { title: 'Collect participant assessments and generate training outcome report' },
+        ];
+      } else {
+        generatedSubtasks = [
+          { title: 'Audit input documentation against company SOP standards' },
+          { title: 'Process operational workflow and update central system records' },
+          { title: 'Complete verification checklist and file compliance closure' },
+        ];
+      }
+
+      // 6. Create the official task directive in the database!
       let createdTaskId = null;
 
       if (!isSensitive) {
-        // Actually create the official task directive in the database!
         const created = await ceoTaskService.createOfficialTask({
           title: taskForm.title.trim(),
-          description: taskForm.description.trim() || `Directive assigned via AI Allocation Engine to ${empName}.`,
-          department: matchedDept,
+          description: taskForm.description.trim() || `Directive allocated by AI to ${empName} based on semantic understanding of "${taskForm.title}".`,
+          department: winningDept,
+          dept_id: selectedAssignee.dept_id,
           priority: 'High',
-          assignee_id: bestCandidate.id,
+          assignee_id: selectedAssignee.id,
           assignee_name: empName,
-          assignee_email: bestCandidate.email,
+          assignee_email: selectedAssignee.email,
           due_date: targetDeadline,
+          subtasks: generatedSubtasks,
         });
 
         createdTaskId = created?.id || created?.data?.id || created?.data?.taskId || 'created';
       }
 
+      // 7. Compose NLP Reasoning
+      const triggerPhrase = matchedTriggers.length > 0 ? `detected wording terms: "${matchedTriggers.slice(0, 4).join(', ')}"` : 'domain context';
+
+      const rationaleText = isSensitive
+        ? `This directive involves executive compensation, policy, or authority and cannot be auto-dispatched. It has been queued in Executive Approvals for CEO decision.`
+        : `AI classified this directive under ${winningDept} based on ${triggerPhrase}. Assigned to ${empName} (${desigTitle}) as the designated specialist in ${winningDept} with optimal workload capacity.`;
+
       const result = {
         mode: isSensitive ? 'approval' : 'allocated',
+        detectedDepartment: winningDept,
+        matchedTriggers,
         employee: {
+          id: selectedAssignee.id,
           name: empName,
-          department: matchedDept,
+          department: winningDept,
           designation: desigTitle,
         },
         plan: {
@@ -215,14 +322,8 @@ export const AiControlPage = () => {
             month: 'short',
             year: 'numeric',
           }),
-          rationale: isSensitive
-            ? 'This directive involves executive authority, compensation, or policy adjustment and cannot be dispatched autonomously. It has been held in the Executive Approvals queue for your decision.'
-            : `Assigned to ${empName} (${desigTitle}) based on domain specialization in ${matchedDept}, active shift availability, and lowest current workload.`,
-          subtasks: [
-            { title: 'Define deliverable scope and verify input requirements' },
-            { title: 'Execute deliverable according to department SOP' },
-            { title: 'Perform verification check and upload proof of completion' },
-          ],
+          rationale: rationaleText,
+          subtasks: generatedSubtasks,
         },
         task: { id: createdTaskId },
       };
@@ -231,8 +332,8 @@ export const AiControlPage = () => {
       toast.show(
         result.mode === 'approval' ? 'Queued for your approval' : 'Allocated & Created',
         result.mode === 'approval'
-          ? 'This is sensitive, so it waits for your decision.'
-          : `Assigned to ${result.employee.name} in ${result.employee.department}.`
+          ? 'Sensitive directive queued for CEO approval.'
+          : `Assigned to ${result.employee.name} in ${winningDept}.`
       );
     } catch (err) {
       toast.show('Allocation failed', err.message || 'Unknown error occurred', 'destructive');
@@ -244,7 +345,6 @@ export const AiControlPage = () => {
   const handleRunReview = async () => {
     setIsReviewing(true);
     try {
-      // Trigger role-based task generation in the backend
       const res = await ceoTaskService.generateRoleTasks();
       const count = Array.isArray(res?.data) ? res.data.length : 9;
 
@@ -288,22 +388,22 @@ export const AiControlPage = () => {
             <div className="pointer-events-none absolute -right-20 -top-20 h-52 w-52 rounded-full bg-signal/[0.06] blur-3xl" />
             <div className="flex items-center gap-2">
               <Sparkles className="h-3.5 w-3.5 text-signal" />
-              <p className="eyebrow text-signal/90">AI allocation</p>
+              <p className="eyebrow text-signal/90">AI allocation engine</p>
             </div>
             <h2 className="mt-2 font-display text-2xl text-foreground">
-              Describe a task. AI finds the right owner.
+              Describe a task. AI understands the wording & finds the owner.
             </h2>
 
             <div className="mt-4 space-y-3">
               <input
                 className="field"
-                placeholder="e.g. Prepare the regional pricing benchmark before Friday"
+                placeholder="e.g. Deploy production API build and inspect server metrics"
                 value={taskForm.title}
                 onChange={(e) => setTaskForm({ ...taskForm, title: e.target.value })}
               />
               <textarea
                 className="field min-h-[74px] resize-none"
-                placeholder="Any detail that changes who should own it"
+                placeholder="Any specific delivery requirements, SOP steps, or operational instructions"
                 value={taskForm.description}
                 onChange={(e) => setTaskForm({ ...taskForm, description: e.target.value })}
               />
@@ -312,10 +412,10 @@ export const AiControlPage = () => {
                 <select
                   value={taskForm.department || 'any'}
                   onChange={(e) => setTaskForm({ ...taskForm, department: e.target.value === 'any' ? '' : e.target.value })}
-                  className="w-[200px] rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-[12px] text-foreground outline-none transition focus:border-signal/50"
+                  className="w-[200px] rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-[12px] text-foreground outline-none transition focus:border-signal/50 cursor-pointer"
                 >
                   <option value="any" className="bg-[#141418] text-foreground">
-                    Any department
+                    Auto-detect department
                   </option>
                   {DEPARTMENTS.map((dept) => (
                     <option key={dept} value={dept} className="bg-[#141418] text-foreground">
@@ -327,16 +427,16 @@ export const AiControlPage = () => {
                 <button
                   onClick={handleAllocate}
                   disabled={isAllocating}
-                  className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-signal px-4 py-2 text-[12.5px] font-medium text-primary-foreground transition hover:bg-signal/90 disabled:opacity-60 cursor-pointer"
+                  className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-signal px-4 py-2 text-[12.5px] font-medium text-primary-foreground transition hover:bg-signal/90 disabled:opacity-60 cursor-pointer shadow-sm"
                 >
                   {isAllocating ? (
                     <>
                       <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      Thinking…
+                      Analyzing wording…
                     </>
                   ) : (
                     <>
-                      <Sparkles className="h-3.5 w-3.5" />
+                      <Cpu className="h-3.5 w-3.5" />
                       Allocate with AI
                     </>
                   )}
@@ -346,25 +446,36 @@ export const AiControlPage = () => {
 
             {/* Allocation Result Box */}
             {allocatedResult && (
-              <div className="fade-up mt-4 rounded-lg border border-white/[0.08] bg-background/50 p-4">
+              <div className="fade-up mt-4 rounded-lg border border-white/[0.08] bg-background/50 p-4 space-y-2.5">
                 <div className="flex items-center justify-between">
-                  <p className="eyebrow text-signal">
-                    {allocatedResult.mode === 'approval' ? 'Queued for CEO approval' : 'Allocated'}
-                  </p>
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex items-center gap-1 rounded-md bg-signal/10 border border-signal/20 px-2 py-0.5 text-[10px] font-medium text-signal uppercase tracking-wider">
+                      <Target className="h-2.5 w-2.5" />
+                      {allocatedResult.detectedDepartment}
+                    </span>
+                    <p className="eyebrow text-signal/80">
+                      {allocatedResult.mode === 'approval' ? 'Queued for CEO approval' : 'Allocated to department specialist'}
+                    </p>
+                  </div>
                   <span className="num text-[10px] text-muted-foreground">
                     {allocatedResult.plan?.due_date}
                   </span>
                 </div>
-                <p className="mt-1.5 text-[13px] font-medium text-foreground">
+
+                <p className="text-[13px] font-medium text-foreground">
                   {allocatedResult.employee?.name} · {allocatedResult.employee?.department}
                   {allocatedResult.employee?.designation ? ` (${allocatedResult.employee.designation})` : ''}
                 </p>
-                <p className="mt-1 text-[11.5px] leading-relaxed text-muted-foreground">
+
+                <p className="text-[11.5px] leading-relaxed text-muted-foreground">
                   {allocatedResult.plan?.rationale}
                 </p>
 
                 {allocatedResult.plan?.subtasks?.length > 0 && (
-                  <div className="mt-2.5 space-y-1">
+                  <div className="mt-2.5 space-y-1 pt-2 border-t border-white/[0.05]">
+                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground/80 mb-1">
+                      Generated Action Plan
+                    </p>
                     {allocatedResult.plan.subtasks.map((st, i) => (
                       <p key={i} className="flex items-start gap-1.5 text-[11px] text-foreground/75">
                         <span className="mt-[5px] h-1 w-1 shrink-0 rounded-full bg-signal/70" />
@@ -374,13 +485,15 @@ export const AiControlPage = () => {
                   </div>
                 )}
 
-                <Link
-                  to={allocatedResult.mode === 'approval' ? '/approvals' : (allocatedResult.task?.id ? `/tasks/${allocatedResult.task.id}` : '/tasks')}
-                  className="mt-3 inline-flex items-center gap-1.5 text-[11.5px] font-medium text-signal transition hover:gap-2.5"
-                >
-                  {allocatedResult.mode === 'approval' ? 'Review the decision' : 'Open the task'}{' '}
-                  <ArrowRight className="h-3 w-3" />
-                </Link>
+                <div className="pt-2">
+                  <Link
+                    to={allocatedResult.mode === 'approval' ? '/approvals' : (allocatedResult.task?.id && allocatedResult.task.id !== 'created' ? `/tasks/${allocatedResult.task.id}` : '/tasks')}
+                    className="inline-flex items-center gap-1.5 text-[11.5px] font-medium text-signal transition hover:gap-2.5"
+                  >
+                    {allocatedResult.mode === 'approval' ? 'Review the decision' : 'Open the task in Task Ledger'}{' '}
+                    <ArrowRight className="h-3 w-3" />
+                  </Link>
+                </div>
               </div>
             )}
           </section>

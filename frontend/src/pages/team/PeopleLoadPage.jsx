@@ -118,12 +118,20 @@ export const PeopleLoadPage = () => {
                       emp.name ||
                       'Specialist';
                     const initials = getInitials(name);
-                    const desig = emp.designation || emp.designationTitle || emp.role || 'Specialist';
-                    const seniority = emp.seniority || 'Mid';
+                    const desig =
+                      emp.designation_title ||
+                      emp.desig_title ||
+                      emp.designation ||
+                      emp.designationTitle ||
+                      emp.role ||
+                      'Specialist';
+                    const seniority = emp.seniority || (desig.includes('Leader') ? 'Lead' : desig.includes('Intern') ? 'Junior' : 'Mid');
 
                     const empTasks = tasks.filter(
                       (t) =>
                         t.assignee_id === emp.id ||
+                        t.assigned_to_id === emp.id ||
+                        (t.assignee_email && t.assignee_email === emp.email) ||
                         (t.assigned_to_email && t.assigned_to_email === emp.email)
                     );
                     const overdueCount = empTasks.filter(
@@ -132,6 +140,10 @@ export const PeopleLoadPage = () => {
 
                     // Capacity load formula: max 4 tasks benchmark
                     const loadPct = Math.min(100, Math.round((empTasks.length / 4) * 100));
+
+                    const currentAvailability =
+                      emp.availability ||
+                      (emp.availability_status === 'AVAILABLE' ? 'Available' : emp.availability_status === 'ON_LEAVE' ? 'On leave' : 'Available');
 
                     return (
                       <div key={emp.id} className="panel p-4 space-y-3 flex flex-col justify-between">
@@ -151,7 +163,7 @@ export const PeopleLoadPage = () => {
                             </div>
                             {/* Availability Selector */}
                             <select
-                              value={emp.availability || 'Available'}
+                              value={currentAvailability}
                               onChange={(e) => handleAvailabilityChange(emp.id, e.target.value)}
                               className="bg-transparent border border-white/10 rounded px-1.5 py-0.5 text-[10px] text-foreground font-medium cursor-pointer"
                             >
