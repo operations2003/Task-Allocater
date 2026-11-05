@@ -1,10 +1,8 @@
 export const DEPARTMENTS = [
-  'Operations',
-  'Sales',
-  'Marketing',
-  'Finance',
-  'Engineering',
-  'People',
+  'HR Operations',
+  'Talent Acquisition',
+  'IT',
+  'Learning & Development',
 ];
 
 export const TASK_STATUSES = [

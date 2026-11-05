@@ -58,7 +58,7 @@ export const PeopleLoadPage = () => {
 
   // Group employees by department
   const groupedByDept = employees.reduce((acc, emp) => {
-    const dept = emp.department || emp.departmentName || emp.dept_name || 'Unassigned';
+    const dept = emp.department || emp.departmentName || emp.department_name || emp.dept_name || 'Unassigned';
     if (!acc[dept]) acc[dept] = [];
     acc[dept].push(emp);
     return acc;

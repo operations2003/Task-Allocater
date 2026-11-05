@@ -41,8 +41,12 @@ export const CommandCentrePage = () => {
 
       // Department summaries
       const deptSummaries = DEPARTMENTS.map((deptName) => {
-        const dEmps = empsRaw.filter((e) => (e.department || e.departmentName || e.dept_name) === deptName);
-        const dTasks = openTasks.filter((t) => (t.department || t.dept_name) === deptName);
+        const dEmps = empsRaw.filter(
+          (e) => (e.department || e.departmentName || e.department_name || e.dept_name) === deptName
+        );
+        const dTasks = openTasks.filter(
+          (t) => (t.department || t.department_name || t.dept_name) === deptName
+        );
         const maxCapacity = Math.max(4, dEmps.length * 4);
         const load = Math.min(100, Math.round((dTasks.length / maxCapacity) * 100));
         return {

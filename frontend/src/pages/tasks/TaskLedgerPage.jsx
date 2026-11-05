@@ -72,7 +72,7 @@ export const TaskLedgerPage = () => {
 
     // 2. Department Filter
     if (deptFilter !== 'All') {
-      const taskDept = task.department || task.dept_name || task.departmentName || '';
+      const taskDept = task.department || task.department_name || task.dept_name || task.departmentName || '';
       if (taskDept.toLowerCase() !== deptFilter.toLowerCase()) return false;
     }
 

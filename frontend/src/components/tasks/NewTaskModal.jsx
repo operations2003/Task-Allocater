@@ -11,7 +11,7 @@ export const NewTaskModal = ({
   const [formData, setFormData] = useState({
     title: '',
     description: '',
-    department: 'Operations',
+    department: DEPARTMENTS[0] || 'HR Operations',
     priority: 'High',
     assignee: '',
     due_date: getTodayStr(),
@@ -149,10 +149,11 @@ export const NewTaskModal = ({
                 </option>
                 {employees.map((emp) => {
                   const name = emp.full_name || `${emp.first_name || ''} ${emp.last_name || ''}`.trim() || emp.name;
-                  const dept = emp.department || emp.departmentName || 'General';
+                  const dept = emp.department || emp.departmentName || emp.department_name || emp.dept_name || 'General';
+                  const desig = emp.designation_title || emp.desig_title || emp.designation || '';
                   return (
                     <option key={emp.id} value={emp.id} className="bg-background text-foreground">
-                      {name} · {dept}
+                      {name} · {dept}{desig ? ` (${desig})` : ''}
                     </option>
                   );
                 })}
