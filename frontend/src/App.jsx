@@ -2,16 +2,17 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext.jsx';
 import { ToastProvider } from './context/ToastContext.jsx';
-import { CeoLayout } from './layouts/CeoLayout.jsx';
+import { NeraLayout } from './layouts/NeraLayout.jsx';
+
+// Core Pages Recreated faithfully from Nera Command Hub
 import { LoginPage } from './pages/auth/LoginPage.jsx';
-import { CeoCommandCentrePage } from './pages/ceo/CeoCommandCentrePage.jsx';
-import { CeoTaskManagementPage } from './pages/ceo/CeoTaskManagementPage.jsx';
-import { AiTaskAllocationPage } from './pages/ceo/AiTaskAllocationPage.jsx';
-import { PendingTasksPage } from './pages/ceo/PendingTasksPage.jsx';
-import { CeoApprovalPage } from './pages/ceo/CeoApprovalPage.jsx';
-import { EmployeeDirectoryPage } from './pages/employees/EmployeeDirectoryPage.jsx';
-import { EmployeeWorkspacePage } from './pages/tasks/EmployeeWorkspacePage.jsx';
-import { LoadingSpinner } from './components/common/LoadingSpinner.jsx';
+import { CommandCentrePage } from './pages/ceo/CommandCentrePage.jsx';
+import { TaskLedgerPage } from './pages/tasks/TaskLedgerPage.jsx';
+import { TaskDetailPage } from './pages/tasks/TaskDetailPage.jsx';
+import { ApprovalsPage } from './pages/ceo/ApprovalsPage.jsx';
+import { PeopleLoadPage } from './pages/team/PeopleLoadPage.jsx';
+import { AiControlPage } from './pages/ceo/AiControlPage.jsx';
+import { MyTasksPage } from './pages/tasks/MyTasksPage.jsx';
 
 // Protected Route Wrapper
 const ProtectedRoute = ({ children, ceoOnly = false }) => {
@@ -19,10 +20,10 @@ const ProtectedRoute = ({ children, ceoOnly = false }) => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-900 flex flex-col justify-center items-center text-white">
-        <LoadingSpinner />
-        <p className="text-xs font-semibold text-slate-400 mt-4 tracking-wide uppercase">
-          Verifying Executive Session...
+      <div className="min-h-screen bg-background flex flex-col justify-center items-center text-foreground">
+        <div className="w-8 h-8 border-2 border-white/20 border-t-signal rounded-full animate-spin" />
+        <p className="eyebrow mt-4 text-signal/80">
+          Verifying session…
         </p>
       </div>
     );
@@ -39,6 +40,12 @@ const ProtectedRoute = ({ children, ceoOnly = false }) => {
   return children;
 };
 
+// Root Switcher based on role
+const RootRoute = () => {
+  const { isCeo } = useAuth();
+  return isCeo ? <CommandCentrePage /> : <MyTasksPage />;
+};
+
 export const App = () => {
   return (
     <Router>
@@ -48,54 +55,59 @@ export const App = () => {
             {/* Public Authentication Route */}
             <Route path="/login" element={<LoginPage />} />
 
-            {/* Protected Standalone CEO Command Centre Layout */}
+            {/* Application Shell with NeraLayout */}
             <Route
               path="/"
               element={
                 <ProtectedRoute>
-                  <CeoLayout />
+                  <NeraLayout />
                 </ProtectedRoute>
               }
             >
-              <Route index element={<Navigate to="/dashboard" replace />} />
-              <Route path="dashboard" element={<CeoCommandCentrePage />} />
-              <Route
-                path="tasks"
-                element={
-                  <ProtectedRoute ceoOnly>
-                    <CeoTaskManagementPage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="ai-allocation"
-                element={
-                  <ProtectedRoute ceoOnly>
-                    <AiTaskAllocationPage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="pending-tasks"
-                element={
-                  <ProtectedRoute ceoOnly>
-                    <PendingTasksPage />
-                  </ProtectedRoute>
-                }
-              />
+              {/* Root: Command Centre (CEO) or My Workspace (Employee) */}
+              <Route index element={<RootRoute />} />
+
+              {/* Task Ledger */}
+              <Route path="tasks" element={<TaskLedgerPage />} />
+
+              {/* Task Detail & Audit Trail */}
+              <Route path="tasks/:id" element={<TaskDetailPage />} />
+
+              {/* CEO Approvals */}
               <Route
                 path="approvals"
                 element={
                   <ProtectedRoute ceoOnly>
-                    <CeoApprovalPage />
+                    <ApprovalsPage />
                   </ProtectedRoute>
                 }
               />
-              <Route path="employees" element={<EmployeeDirectoryPage />} />
-              <Route path="my-tasks" element={<EmployeeWorkspacePage />} />
+
+              {/* People & Load */}
+              <Route
+                path="team"
+                element={
+                  <ProtectedRoute ceoOnly>
+                    <PeopleLoadPage />
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* AI Control */}
+              <Route
+                path="ai"
+                element={
+                  <ProtectedRoute ceoOnly>
+                    <AiControlPage />
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Employee Dedicated Tasks View */}
+              <Route path="my-tasks" element={<MyTasksPage />} />
             </Route>
 
-            {/* Fallback */}
+            {/* Catch-all */}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </AuthProvider>
