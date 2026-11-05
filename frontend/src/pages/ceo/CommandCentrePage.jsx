@@ -117,7 +117,7 @@ export const CommandCentrePage = () => {
   const priorityBars = ['Critical', 'High', 'Medium', 'Low'].map(
     (p) => openTasks.filter((t) => t.priority === p).length
   );
-  const riskBars = [overdueTasks.length, data.approvals.length, 2, 4];
+  const riskBars = [overdueTasks.length, data.approvals.length, 0, 0];
   const deptLoadBars = data.departments.map((d) => d.load);
 
   const kpis = [
@@ -126,14 +126,14 @@ export const CommandCentrePage = () => {
       value: String(openTasks.length),
       delta: `${dueTodayTasks.length} due today`,
       tone: 'neutral',
-      bars: priorityBars.some(Boolean) ? priorityBars : [2, 4, 3, 1],
+      bars: priorityBars.some(Boolean) ? priorityBars : [0, 0, 0, 0],
     },
     {
       label: 'Overdue',
       value: String(overdueTasks.length),
       delta: `${overdueTasks.filter((t) => t.escalation_level === 'CEO').length} escalated to you`,
       tone: 'danger',
-      bars: overdueTasks.length ? overdueTasks.slice(0, 7).map((t) => (t.carried_forward_count || 0) + 1) : [1, 1, 1],
+      bars: overdueTasks.length ? overdueTasks.slice(0, 7).map((t) => (t.carried_forward_count || 0) + 1) : [0, 0, 0, 0],
     },
     {
       label: 'Awaiting approval',
@@ -146,8 +146,8 @@ export const CommandCentrePage = () => {
       label: 'Completion rate',
       value: `${data.completion}%`,
       delta: `${data.departments.length} departments tracked`,
-      tone: data.completion >= 70 ? 'ok' : 'warn',
-      bars: deptLoadBars.length ? deptLoadBars : [30, 60, 45, 80],
+      tone: data.completion >= 70 ? 'ok' : 'neutral',
+      bars: deptLoadBars.length ? deptLoadBars : [0, 0, 0, 0],
     },
   ];
 

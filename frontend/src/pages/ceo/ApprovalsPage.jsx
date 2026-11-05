@@ -17,38 +17,12 @@ export const ApprovalsPage = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
-      // Fetch approvals or mock if backend is in transition
-      const res = await ceoTaskService.getPendingReport ? ceoTaskService.getPendingReport() : Promise.resolve([]);
+      // Fetch approvals from backend
+      const res = await (ceoTaskService.getPendingReport ? ceoTaskService.getPendingReport() : Promise.resolve([]));
       const rawList = res?.data || res?.items || (Array.isArray(res) ? res : []);
 
-      // If rawList is empty or lacks approvals, provide realistic initial sensitive tasks
-      const samplePending = rawList.length > 0 ? rawList : [
-        {
-          id: 'appr-01',
-          title: 'Specialist Reallocation to Enterprise Migration',
-          type: 'role_reassignment',
-          risk: 'high',
-          status: 'Pending',
-          department: 'Engineering',
-          employee_name: 'Shubham Jamdar',
-          justification: 'Requested by Operations to unblock production deployment timeline.',
-          created_at: new Date(Date.now() - 3600000).toISOString(),
-        },
-        {
-          id: 'appr-02',
-          title: 'Senior Compensation Band Adjustment for Candidate Offer',
-          type: 'compensation',
-          risk: 'critical',
-          status: 'Pending',
-          department: 'Sales',
-          employee_name: 'Didar Shah',
-          justification: 'Candidate negotiation exceeds initial budgeted threshold by 12%.',
-          created_at: new Date(Date.now() - 7200000).toISOString(),
-        },
-      ];
-
-      setPendingApprovals(samplePending.filter((a) => a.status === 'Pending'));
-      setDecisionHistory(samplePending.filter((a) => a.status !== 'Pending'));
+      setPendingApprovals(rawList.filter((a) => a.status === 'Pending'));
+      setDecisionHistory(rawList.filter((a) => a.status !== 'Pending'));
     } catch (err) {
       console.warn('Approvals fetch error:', err);
     } finally {

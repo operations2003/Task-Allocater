@@ -30,46 +30,6 @@ export const MyTasksPage = () => {
         list = [];
       }
 
-      // If list is empty or mock is needed for employee preview
-      if (list.length === 0) {
-        list = [
-          {
-            id: 'task-emp-1',
-            title: 'ATS Candidate Pipeline API Migration to Microservices',
-            description: 'Decouple candidate ingest endpoints into high-throughput microservice architecture. Ensure backward compatibility with existing legacy webhooks.',
-            department: 'Engineering',
-            priority: 'High',
-            status: 'In progress',
-            progress: 65,
-            due_date: new Date(Date.now() + 86400000 * 2).toISOString(),
-            assigned_to_email: user?.email || 'employee@nerahub.com',
-          },
-          {
-            id: 'task-emp-2',
-            title: 'Q4 SOC2 Compliance Audit Logs Verification',
-            description: 'Collate security audit trails and verify encrypted backup archives for external compliance submission.',
-            department: 'Finance',
-            priority: 'Medium',
-            status: 'In progress',
-            progress: 30,
-            due_date: new Date(Date.now() - 86400000).toISOString(),
-            assigned_to_email: user?.email || 'employee@nerahub.com',
-          },
-          {
-            id: 'task-emp-3',
-            title: 'Database Sharding Proof of Concept Benchmarks',
-            description: 'Execute stress testing script on PostgreSQL replica nodes under simulated load.',
-            department: 'Engineering',
-            priority: 'Critical',
-            status: 'Completed',
-            progress: 100,
-            due_date: new Date(Date.now() - 86400000 * 3).toISOString(),
-            assigned_to_email: user?.email || 'employee@nerahub.com',
-            evidence_name: 'benchmark_results_v2.pdf',
-          },
-        ];
-      }
-
       setTasks(list);
     } catch (err) {
       toast.show('Failed to load tasks', err.message, 'destructive');

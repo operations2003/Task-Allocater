@@ -34,11 +34,11 @@ export const AiControlPage = () => {
   // Review state
   const [isReviewing, setIsReviewing] = useState(false);
   const [stats, setStats] = useState({
-    reviewed: 18,
-    carried_forward: 4,
-    escalated: 2,
-    new_tasks: 6,
-    reminders_sent: 5,
+    reviewed: 0,
+    carried_forward: 0,
+    escalated: 0,
+    new_tasks: 0,
+    reminders_sent: 0,
   });
   const [dailyReports, setDailyReports] = useState([]);
 
@@ -50,27 +50,13 @@ export const AiControlPage = () => {
   const fetchReviewHistory = async () => {
     try {
       const summaryRes = await ceoTaskService.getAiSummary();
-      const reports = [
-        {
-          id: 'rep-today',
-          report_date: new Date().toISOString(),
-          headline: 'Morning Briefing: Engineering bottleneck mitigated, 4 tasks carried forward',
-          summary: summaryRes?.summaryText || 'Overnight audit completed. 18 active directives checked against SLA metrics. 4 pending tasks were rescheduled without penalising initial SLA timestamps.',
-          reminders_sent: 4,
-          generated_at: new Date().toISOString(),
-        },
-        {
-          id: 'rep-yesterday',
-          report_date: new Date(Date.now() - 86400000).toISOString(),
-          headline: 'Daily Review: SOC2 verification audit and Talent Acquisition cadence',
-          summary: 'All compliance files submitted by Finance team verified. 2 recruitment tasks flagged for senior technical leadership review.',
-          reminders_sent: 7,
-          generated_at: new Date(Date.now() - 86400000).toISOString(),
-        },
-      ];
-      setDailyReports(reports);
+      if (summaryRes?.reports && Array.isArray(summaryRes.reports)) {
+        setDailyReports(summaryRes.reports);
+      } else {
+        setDailyReports([]);
+      }
     } catch {
-      // Handled gracefully with defaults
+      setDailyReports([]);
     }
   };
 
