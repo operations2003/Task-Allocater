@@ -10,3 +10,4 @@ export const PriorityIndicator = ({ priority = 'Low', className = '' }) => {
     </span>
   );
 };
+

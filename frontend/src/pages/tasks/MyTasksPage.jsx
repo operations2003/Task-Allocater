@@ -326,3 +326,4 @@ const MyTaskCard = ({ task, onProgressSave, onFileUpload, onRequestExtension }) 
     </div>
   );
 };
+
